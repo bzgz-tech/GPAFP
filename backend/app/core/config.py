@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "123210"
     jwt_algorithm: str = "HS256"
     debug: bool = True
-    project_name: str = "Gold Price Analysis & Prediction API"
+    project_name: str = "GPAFP API"
     api_v1_str: str = ""
     backend_cors_origins: list[str] = []
     access_token_expire_minutes: int = 60
