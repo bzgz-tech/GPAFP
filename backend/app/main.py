@@ -42,8 +42,33 @@ def root():
 
 _scheduler = None
 
+def init_default_data():
+    """Initialize default data like admin user"""
+    db = SessionLocal()
+    try:
+        user_dao = UserDAO()
+        admin = user_dao.find_by_username(db, "admin")
+        if not admin:
+            print("Creating default admin user...")
+            new_admin = User(
+                username="admin",
+                hashed_password=hash_password("Admin123!"),
+                email="admin@gpafp.com",
+                is_active=True,
+                created_at=datetime.now()
+            )
+            user_dao.create(db, new_admin)
+            print("Default admin user created: admin / Admin123!")
+    except Exception as e:
+        print(f"Error initializing default data: {e}")
+    finally:
+        db.close()
+
 @app.on_event("startup")
 def start_tasks():
+    # Initialize DB data
+    init_default_data()
+    
     global _scheduler
     if os.environ.get("RUN_MAIN") == "true":
         return
