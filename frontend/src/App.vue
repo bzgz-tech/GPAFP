@@ -24,7 +24,7 @@
         <div class="right">
           <el-dropdown trigger="click" @command="handleCommand">
             <span class="user-dropdown">
-              管理员 <el-icon><ArrowDown /></el-icon>
+              {{ store.user?.username || '用户' }} <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store'
 import { GoldMedal, ArrowDown } from '@element-plus/icons-vue'
@@ -57,6 +57,12 @@ const route = useRoute()
 const store = useUserStore()
 const isAuthed = computed(() => !!store.token)
 const activePath = computed(() => route.path)
+
+onMounted(() => {
+  if (store.token && !store.user) {
+    store.fetchUser()
+  }
+})
 
 const handleCommand = (command: string) => {
   if (command === 'logout') {

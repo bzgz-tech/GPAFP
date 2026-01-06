@@ -69,3 +69,25 @@ class AuthServiceImpl(AuthService):
         )
         created = self.dao.create(self.db, new_user)
         return UserDTO.model_validate(created)
+
+    def change_password(self, username: str, old_password: str, new_password: str) -> bool:
+        """
+        修改用户密码。
+        
+        逻辑:
+            1. 验证旧密码是否正确。
+            2. 如果正确，更新为新密码的哈希值。
+            
+        返回:
+            修改成功返回 True，验证失败返回 False。
+        """
+        user = self.dao.find_by_username(self.db, username)
+        if not user:
+            return False
+        if not verify_password(old_password, user.hashed_password):
+            return False
+        
+        user.hashed_password = hash_password(new_password)
+        self.db.add(user)
+        self.db.commit()
+        return True

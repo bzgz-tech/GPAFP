@@ -2,7 +2,21 @@
 
 GPAFP (Gold Price Analysis & Forecast Platform) 是一个端到端的黄金价格趋势分析与预测系统。它集成了数据采集、清洗、实时监控、技术指标分析及价格预测功能，为分析师和交易员提供决策支持。
 
-## 🛠 技术栈
+## �️ 系统展示
+
+### 仪表盘 (Dashboard)
+实时监控金价走势、日涨跌幅及系统运行状态。
+![Dashboard](docs/images/dashboard.png)
+
+### 市场数据 (Market Data)
+查看详细的历史价格数据列表。
+![Market Data](docs/images/market_data.png)
+
+### 分析与预测 (Analysis & Forecast)
+基于技术指标（RSI, MACD, MA）的深度分析及未来价格预测。
+![Analysis](docs/images/analysis.png)
+
+## �🛠 技术栈
 
 ### 后端 (Backend)
 - **核心框架**: FastAPI (Python 3.10+)
@@ -81,7 +95,6 @@ npm run dev
 - **用户名**: `admin`
 - **密码**: `Admin123!`
 
-*(建议首次登录后立即修改密码)*
 
 ## 📄 许可证
 [MIT License](LICENSE)

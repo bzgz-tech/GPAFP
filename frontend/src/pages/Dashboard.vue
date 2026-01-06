@@ -592,7 +592,7 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   border: none;
 }
 .chart-card :deep(.el-card__body) {

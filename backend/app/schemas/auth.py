@@ -17,6 +17,8 @@ class UserCreate(BaseModel):
     username: str
     password: str
     email: str | None = None
+    captcha_id: str | None = None
+    captcha_code: str | None = None
 
 
 class UserLogin(BaseModel):
@@ -31,3 +33,11 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str | None = None
+
+
+class UserChangePassword(BaseModel):
+    username: str
+    old_password: str
+    new_password: str
+    captcha_id: str | None = None
+    captcha_code: str | None = None

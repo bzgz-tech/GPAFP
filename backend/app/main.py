@@ -7,6 +7,11 @@ from app.models.base import Base
 from app.models import price, indicator, forecast, backtest, alert, user, task
 from app.controllers import market, indicator, forecast, backtest, alert, auth, tasks
 from app.tasks.scheduler import create_scheduler
+from app.core.db import SessionLocal
+from app.dao.user_dao import UserDAO
+from app.models.user import User
+from app.core.security import hash_password, verify_password
+from datetime import datetime
 import os
 
 # Create tables (In production, use Alembic)
@@ -55,10 +60,18 @@ def init_default_data():
                 hashed_password=hash_password("Admin123!"),
                 email="admin@gpafp.com",
                 is_active=True,
-                created_at=datetime.now()
+                created_at=datetime.utcnow()
             )
             user_dao.create(db, new_admin)
             print("Default admin user created: admin / Admin123!")
+        else:
+            # Verify password matches, if not update it
+            if not verify_password("Admin123!", admin.hashed_password):
+                print("Updating admin password...")
+                admin.hashed_password = hash_password("Admin123!")
+                db.add(admin)
+                db.commit()
+                print("Admin password updated.")
     except Exception as e:
         print(f"Error initializing default data: {e}")
     finally:
