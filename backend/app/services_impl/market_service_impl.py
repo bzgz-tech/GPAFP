@@ -35,12 +35,39 @@ class MarketServiceImpl(MarketService):
             int: 成功插入的新记录数量。
         """
         # 映射内部时间周期到外部 API 参数
-        interval = "1d" if timeframe == "1d" else "1h"
-        rng_map = {"1d": "1d", "1m": "1mo", "3m": "3mo", "1y": "1y"}
-        rng = rng_map.get(window, "1mo")
+        # Yahoo Finance supports: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo
+        interval_map = {
+            "1m": "1m",
+            "5m": "5m",
+            "15m": "15m",
+            "30m": "30m",
+            "1h": "1h",
+            "1d": "1d",
+            "1w": "1wk",
+            "1M": "1mo"
+        }
+        interval = interval_map.get(timeframe, "1d")
+        
+        # 自动调整请求的数据范围，避免请求过多或过少
+        # 分钟级数据通常只能获取最近的（如 1m 只能最近 7 天）
+        final_window = window
+        if interval in ["1m"]:
+            final_window = "5d" # 1m data is limited to 7 days usually
+        elif interval in ["5m", "15m", "30m"]:
+            final_window = "1mo" # Intraday data limited to 60 days
+        elif interval in ["1h"]:
+             final_window = "3mo" # Hourly data limited to 730 days
+
+        # 如果用户显式指定了 window，优先尝试使用（除了分钟级限制）
+        if window and window != "auto":
+             # 仍需遵守分钟级限制
+             if interval == "1m" and window in ["1mo", "3mo", "1y"]:
+                 final_window = "5d"
+             else:
+                 final_window = window
         
         # 调用外部导入器获取原始数据
-        raw = fetch_prices(symbol, interval, rng)
+        raw = fetch_prices(symbol, interval, final_window)
         
         # 获取数据库中已有的最新时间戳，用于去重
         max_ts = self.price_dao.get_max_ts(db, symbol, timeframe)

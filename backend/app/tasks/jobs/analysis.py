@@ -15,7 +15,10 @@ def job_calculate_indicators(timeframe: str):
     try:
         service = IndicatorServiceImpl(IndicatorDAO(), PriceDAO())
         updated_count = 0
-        for name in ["RSI", "MACD", "MA"]:
+        # MA, MACD, RSI are standard. KDJ needs specific components.
+        # Also add SUPPORT and RESISTANCE
+        indicators = ["RSI", "MACD", "MA", "KDJ_K", "KDJ_D", "KDJ_J", "SUPPORT", "RESISTANCE"]
+        for name in indicators:
             # 重新计算指标
             service.calculate_and_save(db, "XAUUSD", timeframe, name)
             updated_count += 1

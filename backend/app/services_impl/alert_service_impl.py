@@ -75,23 +75,27 @@ class AlertServiceImpl(AlertService):
             latest = price_dao.get_latest(db, symbol, "1d")
         
         if not latest:
-            return
+            return []
             
         current_price = latest.close
         alerts = self.alert_dao.get_active(db, symbol)
         
+        triggered_list = []
         for alert in alerts:
-            triggered = False
+            is_triggered = False
             if alert.condition == "price_above" and current_price > alert.threshold:
-                triggered = True
+                is_triggered = True
             elif alert.condition == "price_below" and current_price < alert.threshold:
-                triggered = True
+                is_triggered = True
             
-            if triggered:
+            if is_triggered:
                 # 标记告警为已触发（非活跃）
                 self.alert_dao.update_status(db, alert.id, False)
                 # TODO: 集成邮件或短信通知服务
                 print(f"告警触发: {alert.name} - 当前价格 {current_price} 满足条件 {alert.condition} {alert.threshold}")
+                triggered_list.append(alert)
+        
+        return triggered_list
 
     def initialize_defaults(self, db: Session, symbol: str):
         """

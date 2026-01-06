@@ -58,49 +58,64 @@
         <div class="card-header">
           <div class="header-title">
             <el-icon><Histogram /></el-icon>
-            <span>历史价格走势</span>
+            <span>K线走势</span>
           </div>
-          <el-radio-group v-model="range" size="small" @change="loadChart">
-            <el-radio-button label="1d">1天</el-radio-button>
-            <el-radio-button label="1m">1月</el-radio-button>
-            <el-radio-button label="3m">3月</el-radio-button>
-            <el-radio-button label="1y">1年</el-radio-button>
-          </el-radio-group>
+          <div class="chart-controls">
+            <el-checkbox-group v-model="selectedIndicators" size="small" @change="loadChart">
+              <el-checkbox-button label="MA">MA</el-checkbox-button>
+              <el-checkbox-button label="MACD">MACD</el-checkbox-button>
+              <el-checkbox-button label="RSI">RSI</el-checkbox-button>
+              <el-checkbox-button label="KDJ">KDJ</el-checkbox-button>
+              <el-checkbox-button label="SUPPORT">支撑</el-checkbox-button>
+              <el-checkbox-button label="RESISTANCE">压力</el-checkbox-button>
+            </el-checkbox-group>
+            <el-radio-group v-model="range" size="small" @change="loadChart">
+              <el-radio-button label="1m">1分</el-radio-button>
+              <el-radio-button label="5m">5分</el-radio-button>
+              <el-radio-button label="15m">15分</el-radio-button>
+              <el-radio-button label="1h">1时</el-radio-button>
+              <el-radio-button label="1d">日K</el-radio-button>
+            </el-radio-group>
+          </div>
         </div>
       </template>
       <div ref="chartRef" class="chart"></div>
     </el-card>
 
     <el-row :gutter="20" class="bottom-row">
-      <el-col :span="12">
+      <el-col :span="14">
         <el-card shadow="never" class="bottom-card">
           <template #header>
             <div class="card-header">
               <div class="header-title">
-                <el-icon><Timer /></el-icon>
-                <span>数据采集状态</span>
+                <el-icon><Reading /></el-icon>
+                <span>市场资讯</span>
               </div>
-              <el-button link type="primary" @click="loadStatus">刷新</el-button>
+              <el-tag size="small" type="info">实时聚合</el-tag>
             </div>
           </template>
-          <el-table :data="taskList" style="width: 100%; height: 100%" stripe>
-            <el-table-column prop="name" label="任务名称" />
-            <el-table-column prop="lastRun" label="上次执行" width="160" />
-            <el-table-column prop="inserted" label="采集数量" width="100" />
-            <el-table-column prop="totalRuns" label="总执行次数" width="100" />
-            <el-table-column prop="status" label="状态" width="80">
+          <el-table :data="newsList" style="width: 100%; height: 100%" stripe :show-header="false">
+            <el-table-column width="80">
+               <template #default="{ row }">
+                  <el-tag size="small" :type="getImpactType(row.impact)">{{ getImpactLabel(row.impact) }}</el-tag>
+               </template>
+            </el-table-column>
+            <el-table-column prop="title" show-overflow-tooltip>
               <template #default="{ row }">
-                <el-tag v-if="!row.error" type="success" size="small">正常</el-tag>
-                <el-tooltip v-else :content="row.error" placement="top">
-                  <el-tag type="danger" size="small">异常</el-tag>
-                </el-tooltip>
+                <span class="news-title">{{ row.title }}</span>
+                <span class="news-time">{{ formatTime(row.published_at) }}</span>
               </template>
+            </el-table-column>
+            <el-table-column prop="category" width="80" align="right">
+               <template #default="{ row }">
+                 <el-tag size="small" effect="plain">{{ getCategoryLabel(row.category) }}</el-tag>
+               </template>
             </el-table-column>
           </el-table>
         </el-card>
       </el-col>
       
-      <el-col :span="12">
+      <el-col :span="10">
         <el-card shadow="never" class="bottom-card">
           <template #header>
             <div class="card-header">
@@ -163,11 +178,12 @@ import { ref, onMounted, computed, reactive, nextTick, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import api from '@/services/api'
 import { ElMessage } from 'element-plus'
-import { Money, TrendCharts, Aim, Bell, Histogram, Timer, Plus, Delete } from '@element-plus/icons-vue'
+import { Money, TrendCharts, Aim, Bell, Histogram, Timer, Plus, Delete, Reading } from '@element-plus/icons-vue'
 
 const chartRef = ref<HTMLElement | null>(null)
 let chart: echarts.ECharts | null = null
-const range = ref<'1d' | '1m' | '3m' | '1y'>('1d')
+const range = ref<'1m' | '5m' | '15m' | '1h' | '1d'>('1d')
+const selectedIndicators = ref<string[]>(['MA'])
 const latestDisplay = ref('—')
 const latestTime = ref('')
 const nextDayForecast = ref('—')
@@ -176,6 +192,7 @@ const dailyChange = ref('—')
 const dailyChangeTime = ref('')
 const status = ref<any>({})
 const alerts = ref<any[]>([])
+const newsList = ref<any[]>([])
 const dialogVisible = ref(false)
 const creating = ref(false)
 const alertForm = reactive({
@@ -185,7 +202,33 @@ const alertForm = reactive({
   threshold: 0
 })
 
+const getImpactType = (impact: string) => {
+  if (impact === 'Bullish') return 'danger'
+  if (impact === 'Bearish') return 'success' // Green for bearish in China? Or usually Red=Up/Green=Down.
+  // In China: Red=Up (Bullish), Green=Down (Bearish).
+  // "利多" -> Bullish -> Red -> danger. "利空" -> Bearish -> Green -> success.
+  return 'info'
+}
+
+const getImpactLabel = (impact: string) => {
+  if (impact === 'Bullish') return '利多'
+  if (impact === 'Bearish') return '利空'
+  return '中性'
+}
+
+const getCategoryLabel = (cat: string) => {
+  const map: Record<string, string> = {
+    'Policy': '政策',
+    'Data': '数据',
+    'Geopolitics': '地缘'
+  }
+  return map[cat] || cat
+}
+
 const taskList = computed(() => {
+  // ... (Keep existing if needed, but we removed the table from UI. Can delete this block or keep for debug)
+  return [] 
+})
   const list = []
   if (status.value.realtime_data_fetch) {
     list.push({
@@ -316,71 +359,183 @@ const loadRealtimeStats = async () => {
 
 const loadChart = async () => {
   try {
-    // Use 1m (minute) data for 1d range to show real-time trend
-    // Use 1d (daily) data for other ranges (1m, 3m, 1y) for macro trend
-    // For 1m range, we could use 1h data, but let's keep it simple for now
-    let timeframe = '1d'
-    if (range.value === '1d') {
-      timeframe = '1m'
-    } else if (range.value === '1m') {
-      timeframe = '1h'
+    const timeframe = range.value
+    let windowStr = '1d'
+    
+    if (timeframe === '1m' || timeframe === '5m' || timeframe === '15m' || timeframe === '1h') {
+        windowStr = '5d' 
+        if (timeframe === '1m') windowStr = '1d' 
+    } else if (timeframe === '1d') {
+        windowStr = '1y'
     }
 
-    const { data } = await api.get('/market/history', {
-      params: { symbol: 'XAUUSD', timeframe, window: range.value },
+    // Fetch Price Data
+    const { data: priceData } = await api.get('/market/history/detailed', {
+      params: { symbol: 'XAUUSD', timeframe, window: windowStr },
     })
     
-    // Ensure chart is initialized
-    if (!chart && chartRef.value) {
-      initChart()
+    // Sort by TS ascending
+    priceData.sort((a: any, b: any) => new Date(a.ts).getTime() - new Date(b.ts).getTime())
+    
+    const dates = priceData.map((d: any) => d.ts)
+    // ECharts Candle: [Open, Close, Lowest, Highest]
+    const values = priceData.map((d: any) => [d.open, d.close, d.low, d.high])
+    
+    // Fetch Indicators
+    const indicatorsData: any = {}
+    
+    // Expand composite indicators
+    const requests = []
+    for (const ind of selectedIndicators.value) {
+        if (ind === 'KDJ') {
+            requests.push('KDJ_K', 'KDJ_D', 'KDJ_J')
+        } else {
+            requests.push(ind)
+        }
     }
 
-    if (chart) {
-      const seriesData = data.map((d: any) => [new Date(d.ts), d.value])
-      
-      const option = {
-        grid: { left: '3%', right: '4%', bottom: '3%', top: '3%', containLabel: true },
-        tooltip: { 
-          trigger: 'axis', 
-          valueFormatter: (v: number) => `¥${Number(v).toFixed(2)}` 
-        },
-        xAxis: { 
-          type: 'time', 
-          boundaryGap: false,
-          axisLabel: {
-             formatter: '{MM}-{dd} {HH}:{mm}'
-          }
-        },
-        yAxis: { 
-          type: 'value', 
-          scale: true, 
-          axisLabel: { formatter: (v: number) => `¥${v.toFixed(0)}` } 
-        },
-        series: [{
-          type: 'line',
-          data: seriesData,
-          smooth: true,
-          showSymbol: false,
-          lineStyle: { width: 3, color: '#1890ff' },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(24,144,255,0.3)' },
-              { offset: 1, color: 'rgba(24,144,255,0.01)' }
-            ])
-          }
-        }],
-      }
-      
-      console.log('Setting chart option:', option)
-      chart.setOption(option)
-      chart.resize()
+    for (const req of requests) {
+        try {
+            const { data } = await api.get('/indicator/history', {
+                params: { symbol: 'XAUUSD', timeframe, name: req }
+            })
+            const map = new Map()
+            data.forEach((d: any) => map.set(new Date(d.ts).getTime(), d.value))
+            
+            // Align with price dates
+            const series = dates.map((d: string) => map.get(new Date(d).getTime()) || null)
+            indicatorsData[req] = series
+        } catch (e) {
+            console.error(`Failed to load ${req}`, e)
+        }
     }
+
+    if (!chart && chartRef.value) initChart()
     
-    
-    // Stats are now handled by loadRealtimeStats independently
+    if (chart) {
+        const option: any = {
+             tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'cross' }
+             },
+             grid: [
+                 { left: '3%', right: '3%', top: '10%', height: '55%' },
+                 { left: '3%', right: '3%', top: '75%', height: '20%' }
+             ],
+             xAxis: [
+                 { type: 'category', data: dates.map((d: string) => new Date(d).toLocaleString()), scale: true, boundaryGap: false, gridIndex: 0, axisLabel: { show: false } },
+                 { type: 'category', data: dates.map((d: string) => new Date(d).toLocaleString()), scale: true, boundaryGap: false, gridIndex: 1 }
+             ],
+             yAxis: [
+                 { scale: true, gridIndex: 0, splitLine: { show: false } },
+                 { scale: true, gridIndex: 1, splitLine: { show: false } }
+             ],
+             dataZoom: [{ type: 'inside', xAxisIndex: [0, 1] }, { type: 'slider', xAxisIndex: [0, 1] }],
+             series: [
+                 {
+                     type: 'candlestick',
+                     name: 'Gold',
+                     data: values,
+                     itemStyle: {
+                         color: '#ef232a',
+                         color0: '#14b143',
+                         borderColor: '#ef232a',
+                         borderColor0: '#14b143'
+                     }
+                 }
+             ]
+        }
+        
+        // Add Indicators
+        // MA -> Main Chart
+        if (indicatorsData['MA']) {
+            option.series.push({
+                name: 'MA20',
+                type: 'line',
+                data: indicatorsData['MA'],
+                smooth: true,
+                symbol: 'none',
+                lineStyle: { opacity: 0.8, width: 1 }
+            })
+        }
+        
+        // Sub Chart Logic
+        let hasSubChart = false
+        
+        if (indicatorsData['RSI']) {
+             option.series.push({
+                name: 'RSI',
+                type: 'line',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: indicatorsData['RSI'],
+                symbol: 'none',
+                itemStyle: { color: '#fa8c16' }
+             })
+             hasSubChart = true
+        }
+        
+        if (indicatorsData['MACD']) {
+             // MACD usually has DIFF, DEA, HIST. My backend returns DIFF by default for "MACD".
+             // Assuming user wants simple line for now or I should have fetched 3 parts.
+             // Let's just show DIFF line.
+             option.series.push({
+                name: 'MACD',
+                type: 'line',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: indicatorsData['MACD'],
+                symbol: 'none',
+                itemStyle: { color: '#1890ff' }
+             })
+             hasSubChart = true
+        }
+
+        if (indicatorsData['KDJ_K']) {
+              option.series.push(
+                 { name: 'K', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: indicatorsData['KDJ_K'], symbol: 'none', itemStyle: { color: '#eb2f96' } },
+                 { name: 'D', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: indicatorsData['KDJ_D'], symbol: 'none', itemStyle: { color: '#faad14' } },
+                 { name: 'J', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: indicatorsData['KDJ_J'], symbol: 'none', itemStyle: { color: '#722ed1' } }
+              )
+              hasSubChart = true
+         }
+         
+         if (indicatorsData['SUPPORT']) {
+              option.series.push({
+                  name: 'Support',
+                  type: 'line',
+                  data: indicatorsData['SUPPORT'],
+                  smooth: true,
+                  symbol: 'none',
+                  lineStyle: { type: 'dashed', color: '#14b143', width: 1.5 }
+              })
+         }
+
+         if (indicatorsData['RESISTANCE']) {
+              option.series.push({
+                  name: 'Resistance',
+                  type: 'line',
+                  data: indicatorsData['RESISTANCE'],
+                  smooth: true,
+                  symbol: 'none',
+                  lineStyle: { type: 'dashed', color: '#ef232a', width: 1.5 }
+              })
+         }
+        
+         if (!hasSubChart) {
+            // Hide bottom grid if no subchart indicators
+            option.grid[0].height = '80%'
+            option.grid[1].height = '0%'
+            option.xAxis[0].axisLabel = { show: true }
+            option.xAxis[1].show = false
+            option.yAxis[1].show = false
+        }
+        
+        chart.setOption(option, true)
+    }
   } catch (e: any) {
     console.error('Load chart error:', e)
-    ElMessage.error(e?.response?.data?.detail || '加载历史数据失败')
+    ElMessage.error(e?.response?.data?.detail || '加载图表数据失败')
   }
 }
 
@@ -390,6 +545,15 @@ const loadStatus = async () => {
     status.value = data
   } catch {
     status.value = {}
+  }
+}
+
+const loadNews = async () => {
+  try {
+    const { data } = await api.get('/news/')
+    newsList.value = data
+  } catch (e) {
+    console.error('Load news error', e)
   }
 }
 
@@ -469,6 +633,7 @@ onMounted(() => {
   loadStatus()
   loadAlerts()
   loadForecast()
+  loadNews()
   globalThis.addEventListener('resize', () => chart && chart.resize())
   
   // Refresh data every 10 seconds to show real-time updates
@@ -484,6 +649,7 @@ onMounted(() => {
     loadForecast()
     loadStatus()
     loadAlerts()
+    loadNews()
   }, 10000)
 })
 
@@ -613,6 +779,11 @@ onUnmounted(() => {
   font-weight: 600;
   font-size: 16px;
 }
+.chart-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
 .chart {
   width: 100%;
   height: 100%;
@@ -621,5 +792,14 @@ onUnmounted(() => {
   flex: 2;
   min-height: 0;
   margin-top: 0;
+}
+.news-title {
+  font-weight: 500;
+  color: #333;
+}
+.news-time {
+  margin-left: 8px;
+  color: #999;
+  font-size: 12px;
 }
 </style>
