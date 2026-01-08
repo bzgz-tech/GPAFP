@@ -57,6 +57,40 @@ class ForecastServiceImpl(ForecastService):
             rows = self.forecast_dao.get_range(db, symbol, timeframe, horizon, start_ts, end_ts)
         return rows
 
+    def predict_next_days(self, db: Session, symbol: str, days: int = 5) -> list[dict]:
+        """
+        预测未来几天的价格趋势
+        """
+        # 获取最新的历史数据
+        prices = self.price_dao.get_range(db, symbol, "1d", start_ts=None)
+        if not prices or len(prices) < 10:
+            return []
+
+        df = pd.DataFrame([{"ts": p.ts, "close": p.close} for p in prices])
+        df.sort_values("ts", inplace=True)
+        
+        # 简单预测算法：基于最近5天的平均涨跌幅
+        df['change'] = df['close'].pct_change()
+        avg_change = df['change'].tail(5).mean()
+        
+        last_price = df['close'].iloc[-1]
+        last_date = df['ts'].iloc[-1]
+        
+        predictions = []
+        current_price = last_price
+        
+        for i in range(1, days + 1):
+            next_date = last_date + timedelta(days=i)
+            # 引入一点随机性或衰减，这里保持简单线性
+            current_price = current_price * (1 + avg_change)
+            predictions.append({
+                "date": next_date.strftime("%Y-%m-%d"),
+                "price": round(current_price, 2),
+                "change": round(avg_change * 100, 2)
+            })
+            
+        return predictions
+
     def calculate_and_save(self, db: Session, symbol: str, timeframe: str, horizon: int):
         """
         核心预测算法：计算并保存预测数据。

@@ -74,12 +74,25 @@ def read_history(
         list[PricePointOut]: 历史价格点列表。
     """
     now = datetime.utcnow()
-    days_map = {"1d": 1, "1m": 30, "3m": 90, "1y": 365}
+    days_map = {"1d": 1, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
     days = days_map.get(window, 30)
     start_ts = now - timedelta(days=days)
     
     service = MarketServiceImpl(PriceDAO())
     rows = service.get_history(db, symbol, timeframe, start_ts)
+    
+    # Auto-import if no data found
+    if not rows:
+        try:
+            # Determine appropriate window based on timeframe
+            import_window = window
+            if timeframe == "1m":
+                import_window = "5d"
+            service.import_history(db, symbol, timeframe, import_window)
+            rows = service.get_history(db, symbol, timeframe, start_ts)
+        except Exception as e:
+             print(f"Auto-import failed: {e}")
+
     ratio = usd_cny / 31.1034768
     return [{"ts": r.ts.replace(tzinfo=timezone.utc), "value": round(r.close * ratio, 2), "created_at": r.created_at} for r in rows]
 
@@ -106,13 +119,25 @@ def read_detailed_history(
         list[PriceDetailedOut]: 详细历史价格列表。
     """
     now = datetime.utcnow()
-    days_map = {"1d": 1, "1m": 30, "3m": 90, "1y": 365}
+    days_map = {"1d": 1, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
     days = days_map.get(window, 30)
     start_ts = now - timedelta(days=days)
     
     service = MarketServiceImpl(PriceDAO())
     rows = service.get_history(db, symbol, timeframe, start_ts)
     
+    # Auto-import if no data found
+    if not rows:
+        try:
+            # Determine appropriate window based on timeframe
+            import_window = window
+            if timeframe == "1m":
+                import_window = "5d"
+            service.import_history(db, symbol, timeframe, import_window)
+            rows = service.get_history(db, symbol, timeframe, start_ts)
+        except Exception as e:
+             print(f"Auto-import failed: {e}")
+
     # 倒序排列，方便前端表格展示
     rows.reverse()
     

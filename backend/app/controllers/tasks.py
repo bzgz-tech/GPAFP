@@ -27,6 +27,7 @@ def get_status(db: Session = Depends(get_db)):
         "realtime_data_fetch",      # 实时数据采集
         "hourly_data_fetch",        # 小时级数据采集
         "daily_data_fetch",         # 日级数据采集
+        "news_fetch",               # 新闻资讯采集
         "indicator_calculation_1m", # 分钟级指标计算
         "indicator_calculation_1h", # 小时级指标计算
         "indicator_calculation_1d", # 日级指标计算

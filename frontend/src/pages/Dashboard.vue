@@ -53,6 +53,26 @@
       </el-col>
     </el-row>
 
+    <!-- Historical Price Chart (Restored V1.0.0 Feature) -->
+    <el-card class="chart-card" shadow="never" style="margin-bottom: 20px;">
+      <template #header>
+        <div class="card-header">
+          <div class="header-title">
+            <el-icon><TrendCharts /></el-icon>
+            <span>历史价格走势图</span>
+          </div>
+          <el-radio-group v-model="historyRange" size="small" @change="loadHistoryChart">
+            <el-radio-button label="1d">今日</el-radio-button>
+            <el-radio-button label="1m">1月</el-radio-button>
+            <el-radio-button label="3m">3月</el-radio-button>
+            <el-radio-button label="6m">6月</el-radio-button>
+            <el-radio-button label="1y">1年</el-radio-button>
+          </el-radio-group>
+        </div>
+      </template>
+      <div ref="historyChartRef" class="chart" style="height: 400px;"></div>
+    </el-card>
+
     <el-card class="chart-card" shadow="never">
       <template #header>
         <div class="card-header">
@@ -76,15 +96,96 @@
               <el-radio-button label="1h">1时</el-radio-button>
               <el-radio-button label="1d">日K</el-radio-button>
             </el-radio-group>
+            <el-button link size="small" @click="openSettingsDialog" style="margin-left: 10px">
+                <el-icon><Setting /></el-icon>
+            </el-button>
           </div>
         </div>
       </template>
-      <div ref="chartRef" class="chart"></div>
+      <div style="display: flex; height: 500px;">
+          <div ref="chartRef" class="chart" style="flex: 1; height: 100%;"></div>
+          <div class="chart-info-panel">
+              <div class="info-title">
+                  <el-icon><InfoFilled /></el-icon> 实时指标解读
+              </div>
+              <div class="info-list" v-if="latestIndicators.length > 0">
+                  <div v-for="item in latestIndicators" :key="item.name" class="info-item">
+                      <div class="info-header">
+                          <span class="info-label" :style="{ color: item.color }">{{ item.label }}</span>
+                          <span class="info-value">{{ item.value }}</span>
+                      </div>
+                      <div class="info-desc">{{ item.desc }}</div>
+                  </div>
+              </div>
+              <div v-else class="info-empty">
+                  <p>暂无指标数据</p>
+                  <p style="font-size: 12px; color: #999;">请在上方勾选指标以查看详细解读</p>
+              </div>
+          </div>
+      </div>
     </el-card>
 
-    <el-row :gutter="20" class="bottom-row">
-      <el-col :span="14">
-        <el-card shadow="never" class="bottom-card">
+    <el-row :gutter="20" class="bottom-row" style="margin-bottom: 20px;">
+      <el-col :span="12">
+        <el-card shadow="never" class="bottom-card" :body-style="{ padding: '10px' }">
+          <template #header>
+            <div class="card-header">
+              <div class="header-title">
+                <el-icon><Bell /></el-icon>
+                <span>活跃告警</span>
+              </div>
+              <el-button type="primary" link @click="openAlertDialog" size="small">
+                <el-icon><Plus /></el-icon> 新增
+              </el-button>
+            </div>
+          </template>
+          <el-table :data="alerts" style="width: 100%; height: 100%" stripe empty-text="暂无活跃告警" size="small">
+            <el-table-column prop="name" label="名称" show-overflow-tooltip />
+            <el-table-column label="条件" width="100">
+              <template #default="{ row }">
+                <span :class="row.condition === 'price_above' ? 'text-up' : 'text-down'">
+                    {{ row.condition === 'price_above' ? '≥' : '≤' }} {{ row.threshold }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="60" align="center">
+              <template #default="{ row }">
+                <el-button type="danger" link size="small" @click="deleteAlert(row.id)">
+                  <el-icon><Delete /></el-icon>
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+
+      <el-col :span="12">
+        <el-card shadow="never" class="bottom-card" :body-style="{ padding: '10px' }">
+          <template #header>
+            <div class="card-header">
+              <div class="header-title">
+                <el-icon><Timer /></el-icon>
+                <span>采集状态</span>
+              </div>
+              <el-tag size="small" type="success">正常运行</el-tag>
+            </div>
+          </template>
+          <el-table :data="taskList" style="width: 100%; height: 100%" stripe size="small">
+            <el-table-column prop="name" label="任务" show-overflow-tooltip />
+            <el-table-column label="上次运行" width="140">
+              <template #default="{ row }">
+                <span :class="row.error ? 'text-danger' : ''" style="font-size: 12px;">{{ row.lastRun }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="inserted" label="新增" width="50" align="center" />
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="20" class="news-row">
+      <el-col :span="24">
+        <el-card shadow="never" class="bottom-card" :body-style="{ padding: '10px' }">
           <template #header>
             <div class="card-header">
               <div class="header-title">
@@ -94,53 +195,28 @@
               <el-tag size="small" type="info">实时聚合</el-tag>
             </div>
           </template>
-          <el-table :data="newsList" style="width: 100%; height: 100%" stripe :show-header="false">
-            <el-table-column width="80">
+          <el-table :data="newsList" style="width: 100%; height: 100%" stripe :show-header="false" size="small">
+            <el-table-column width="70">
                <template #default="{ row }">
-                  <el-tag size="small" :type="getImpactType(row.impact)">{{ getImpactLabel(row.impact) }}</el-tag>
+                  <el-tag size="small" :type="getImpactType(row.impact)" effect="dark" style="width: 100%; text-align: center;">{{ getImpactLabel(row.impact) }}</el-tag>
                </template>
             </el-table-column>
-            <el-table-column prop="title" show-overflow-tooltip>
+            <el-table-column prop="title" show-overflow-tooltip min-width="150">
               <template #default="{ row }">
-                <span class="news-title">{{ row.title }}</span>
-                <span class="news-time">{{ formatTime(row.published_at) }}</span>
+                <div class="news-item">
+                    <span class="news-title">{{ row.title }}</span>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column prop="category" width="80" align="right">
+            <el-table-column prop="category" width="60" align="right">
                <template #default="{ row }">
                  <el-tag size="small" effect="plain">{{ getCategoryLabel(row.category) }}</el-tag>
                </template>
             </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
-      
-      <el-col :span="10">
-        <el-card shadow="never" class="bottom-card">
-          <template #header>
-            <div class="card-header">
-              <div class="header-title">
-                <el-icon><Bell /></el-icon>
-                <span>活跃告警</span>
-              </div>
-              <el-button type="primary" link @click="openAlertDialog">
-                <el-icon><Plus /></el-icon> 新增
-              </el-button>
-            </div>
-          </template>
-          <el-table :data="alerts" style="width: 100%; height: 100%" stripe empty-text="暂无活跃告警">
-            <el-table-column prop="name" label="名称" />
-            <el-table-column label="条件" width="120">
-              <template #default="{ row }">
-                {{ row.condition === 'price_above' ? '高于' : '低于' }} {{ row.threshold }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="80" align="center">
-              <template #default="{ row }">
-                <el-button type="danger" link size="small" @click="deleteAlert(row.id)">
-                  <el-icon><Delete /></el-icon>
-                </el-button>
-              </template>
+            <el-table-column width="100" align="right">
+                <template #default="{ row }">
+                    <span class="news-time">{{ formatTime(row.published_at).split(' ')[1] }}</span>
+                </template>
             </el-table-column>
           </el-table>
         </el-card>
@@ -170,6 +246,28 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- Indicator Settings Dialog -->
+    <el-dialog v-model="settingsVisible" title="指标参数设置" width="400px">
+      <el-form :model="indicatorSettings" label-width="120px">
+        <el-divider content-position="left">KDJ 参数</el-divider>
+        <el-form-item label="周期 (N)">
+            <el-input-number v-model="indicatorSettings.KDJ.n" :min="1" :max="100" />
+        </el-form-item>
+        <el-form-item label="K 平滑 (M1)">
+            <el-input-number v-model="indicatorSettings.KDJ.m1" :min="1" :max="100" />
+        </el-form-item>
+        <el-form-item label="D 平滑 (M2)">
+            <el-input-number v-model="indicatorSettings.KDJ.m2" :min="1" :max="100" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="settingsVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveSettings">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -177,13 +275,18 @@
 import { ref, onMounted, computed, reactive, nextTick, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import api from '@/services/api'
+import { formatChartTooltip, INDICATOR_EXPLANATIONS } from '@/utils/chartTooltip'
 import { ElMessage } from 'element-plus'
-import { Money, TrendCharts, Aim, Bell, Histogram, Timer, Plus, Delete, Reading } from '@element-plus/icons-vue'
+import { Money, TrendCharts, Aim, Bell, Histogram, Timer, Plus, Delete, Reading, Setting, InfoFilled } from '@element-plus/icons-vue'
 
 const chartRef = ref<HTMLElement | null>(null)
 let chart: echarts.ECharts | null = null
+const historyChartRef = ref<HTMLElement | null>(null)
+let historyChart: echarts.ECharts | null = null
+const historyRange = ref<'1d' | '1m' | '3m' | '6m' | '1y'>('1d')
 const range = ref<'1m' | '5m' | '15m' | '1h' | '1d'>('1d')
 const selectedIndicators = ref<string[]>(['MA'])
+const latestIndicators = ref<any[]>([])
 const latestDisplay = ref('—')
 const latestTime = ref('')
 const nextDayForecast = ref('—')
@@ -202,11 +305,24 @@ const alertForm = reactive({
   threshold: 0
 })
 
+const settingsVisible = ref(false)
+const indicatorSettings = reactive({
+    KDJ: { n: 9, m1: 3, m2: 3 }
+})
+
+const openSettingsDialog = () => {
+    settingsVisible.value = true
+}
+
+const saveSettings = () => {
+    // Reload chart to apply new settings
+    settingsVisible.value = false
+    loadChart()
+}
+
 const getImpactType = (impact: string) => {
   if (impact === 'Bullish') return 'danger'
-  if (impact === 'Bearish') return 'success' // Green for bearish in China? Or usually Red=Up/Green=Down.
-  // In China: Red=Up (Bullish), Green=Down (Bearish).
-  // "利多" -> Bullish -> Red -> danger. "利空" -> Bearish -> Green -> success.
+  if (impact === 'Bearish') return 'success'
   return 'info'
 }
 
@@ -226,9 +342,6 @@ const getCategoryLabel = (cat: string) => {
 }
 
 const taskList = computed(() => {
-  // ... (Keep existing if needed, but we removed the table from UI. Can delete this block or keep for debug)
-  return [] 
-})
   const list = []
   if (status.value.realtime_data_fetch) {
     list.push({
@@ -260,6 +373,16 @@ const taskList = computed(() => {
       error: status.value.daily_data_fetch.error
     })
   }
+  if (status.value.news_fetch) {
+    list.push({
+      name: '新闻采集',
+      type: 'info',
+      lastRun: formatTime(status.value.news_fetch.last_run),
+      inserted: status.value.news_fetch.inserted ?? 0,
+      totalRuns: status.value.news_fetch.total_runs ?? 0,
+      error: status.value.news_fetch.error
+    })
+  }
   return list
 })
 
@@ -267,6 +390,92 @@ const getChangeClass = (val: string) => {
   if (val.includes('+')) return 'text-up'
   if (val.includes('-')) return 'text-down'
   return ''
+}
+
+const initHistoryChart = () => {
+  if (historyChartRef.value) {
+    if (historyChart) {
+      historyChart.dispose()
+    }
+    historyChart = echarts.init(historyChartRef.value)
+  }
+}
+
+const loadHistoryChart = async () => {
+  try {
+    let timeframe = '1d'
+    // If range is '1d', we want intraday data (e.g. 1m) to show a trend
+    if (historyRange.value === '1d') {
+        timeframe = '1m'
+    }
+
+    const { data } = await api.get('/market/history', {
+      params: { symbol: 'XAUUSD', timeframe: timeframe, window: historyRange.value }
+    })
+    
+    // Sort by TS
+    data.sort((a: any, b: any) => new Date(a.ts).getTime() - new Date(b.ts).getTime())
+    
+    const dates = data.map((d: any) => d.ts)
+    const values = data.map((d: any) => d.value)
+    
+    if (!historyChart && historyChartRef.value) initHistoryChart()
+    
+    if (historyChart) {
+        const option: any = {
+            tooltip: {
+                trigger: 'axis',
+                formatter: formatChartTooltip,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderColor: '#eee',
+                borderWidth: 1,
+                textStyle: { color: '#333' },
+                padding: 10,
+                extraCssText: 'box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); border-radius: 4px;'
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'category',
+                boundaryGap: false,
+                data: dates.map((d: string) => {
+                    const date = new Date(d)
+                    if (historyRange.value === '1d') {
+                        // For intraday, show time only
+                        return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+                    }
+                    return date.toLocaleDateString()
+                })
+            },
+            yAxis: {
+                type: 'value',
+                scale: true
+            },
+            series: [
+                {
+                    name: 'Gold Close',
+                    type: 'line',
+                    smooth: true,
+                    data: values,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                          { offset: 0, color: 'rgba(64, 158, 255, 0.5)' },
+                          { offset: 1, color: 'rgba(64, 158, 255, 0.1)' }
+                        ])
+                    },
+                    itemStyle: { color: '#409EFF' }
+                }
+            ]
+        }
+        historyChart.setOption(option)
+    }
+  } catch (e) {
+      console.error('Failed to load history chart', e)
+  }
 }
 
 const initChart = () => {
@@ -312,37 +521,38 @@ const loadRealtimeStats = async () => {
     }
 
     // 2. Get daily history to calculate change from yesterday's close
-    const { data: historyData } = await api.get('/market/history', {
-      params: { symbol: 'XAUUSD', timeframe: '1d', window: '1m' } // Get 1 month of daily data
+    // Use detailed history to get 'open' price as fallback
+    const { data: historyData } = await api.get('/market/history/detailed', {
+      params: { symbol: 'XAUUSD', timeframe: '1d', window: '1m' }
     })
     
     if (historyData && historyData.length > 0 && currentPrice > 0) {
-      // Find the previous day's close
-      // historyData is sorted by ts ascending
-      // We need to find the last record that is NOT today (strictly less than today's date)
-      // OR simply:
-      // If the last record is today, take the one before it.
-      // If the last record is yesterday, take it.
-      
-      // Let's rely on dates.
-      const today = new Date()
-      // Reset time to 00:00:00 for comparison
-      const todayStr = today.toISOString().split('T')[0]
-      
-      // Check last point
+      // Sort history by TS just in case
+      historyData.sort((a: any, b: any) => new Date(a.ts).getTime() - new Date(b.ts).getTime())
+
       const lastPoint = historyData[historyData.length - 1]
       const lastPointDate = new Date(lastPoint.ts).toISOString().split('T')[0]
       
+      // Determine "Today" based on latest real-time data timestamp, not local system time
+      let todayStr = new Date().toISOString().split('T')[0]
+      if (currentTime) {
+          todayStr = currentTime.toISOString().split('T')[0]
+      }
+      
       let prevClose = 0
       
+      // Check if the last history point is "Today" (Current Session)
       if (lastPointDate === todayStr) {
-        // Last point is today, so prev close is the one before
         if (historyData.length >= 2) {
-          prevClose = historyData[historyData.length - 2].value
+          // If we have history, use yesterday's close
+          prevClose = historyData[historyData.length - 2].close
+        } else {
+          // If no history (only today exists), use today's Open as fallback (Intraday Change)
+          prevClose = lastPoint.open
         }
       } else {
-        // Last point is not today (likely yesterday), so it IS the prev close
-        prevClose = lastPoint.value
+        // Last point is NOT today (it's yesterday or older), so it IS the previous close
+        prevClose = lastPoint.close
       }
       
       if (prevClose > 0) {
@@ -385,16 +595,26 @@ const loadChart = async () => {
     const indicatorsData: any = {}
     
     // Expand composite indicators
-    const requests = []
-    for (const ind of selectedIndicators.value) {
+    const requests: string[] = []
+    
+    // Add default requests
+    selectedIndicators.value.forEach(ind => {
         if (ind === 'KDJ') {
-            requests.push('KDJ_K', 'KDJ_D', 'KDJ_J')
+             // Construct custom KDJ name with parameters if they differ from default
+            const { n, m1, m2 } = indicatorSettings.KDJ
+            const kdjName = `KDJ_${n}_${m1}_${m2}`
+            requests.push(`${kdjName}_K`, `${kdjName}_D`, `${kdjName}_J`)
+        } else if (ind === 'MACD') {
+            requests.push('MACD', 'MACD_DEA', 'MACD_HIST')
         } else {
             requests.push(ind)
         }
-    }
-
+    })
+    
+    // Fetch indicators
     for (const req of requests) {
+        // Skip KDJ if we just added components
+        if (req === 'KDJ') continue;
         try {
             const { data } = await api.get('/indicator/history', {
                 params: { symbol: 'XAUUSD', timeframe, name: req }
@@ -404,7 +624,14 @@ const loadChart = async () => {
             
             // Align with price dates
             const series = dates.map((d: string) => map.get(new Date(d).getTime()) || null)
-            indicatorsData[req] = series
+            
+            // Normalize key for data access
+            if (req.includes('KDJ') && (req.endsWith('_K') || req.endsWith('_D') || req.endsWith('_J'))) {
+                const suffix = req.split('_').pop() // K, D, or J
+                indicatorsData[`KDJ_${suffix}`] = series
+            } else {
+                indicatorsData[req] = series
+            }
         } catch (e) {
             console.error(`Failed to load ${req}`, e)
         }
@@ -413,10 +640,27 @@ const loadChart = async () => {
     if (!chart && chartRef.value) initChart()
     
     if (chart) {
+        // Preserve current zoom level
+        let zoomStart = 0
+        let zoomEnd = 100
+        
+        const prevOption = chart.getOption() as any
+        if (prevOption && prevOption.dataZoom && prevOption.dataZoom.length > 0) {
+            zoomStart = prevOption.dataZoom[0].start
+            zoomEnd = prevOption.dataZoom[0].end
+        }
+
         const option: any = {
              tooltip: {
                 trigger: 'axis',
-                axisPointer: { type: 'cross' }
+                axisPointer: { type: 'cross' },
+                formatter: formatChartTooltip,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderColor: '#eee',
+                borderWidth: 1,
+                textStyle: { color: '#333' },
+                padding: 10,
+                extraCssText: 'box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); border-radius: 4px;'
              },
              grid: [
                  { left: '3%', right: '3%', top: '10%', height: '55%' },
@@ -430,7 +674,10 @@ const loadChart = async () => {
                  { scale: true, gridIndex: 0, splitLine: { show: false } },
                  { scale: true, gridIndex: 1, splitLine: { show: false } }
              ],
-             dataZoom: [{ type: 'inside', xAxisIndex: [0, 1] }, { type: 'slider', xAxisIndex: [0, 1] }],
+             dataZoom: [
+                 { type: 'inside', xAxisIndex: [0, 1], start: zoomStart, end: zoomEnd }, 
+                 { type: 'slider', xAxisIndex: [0, 1], start: zoomStart, end: zoomEnd }
+             ],
              series: [
                  {
                      type: 'candlestick',
@@ -459,47 +706,7 @@ const loadChart = async () => {
             })
         }
         
-        // Sub Chart Logic
-        let hasSubChart = false
-        
-        if (indicatorsData['RSI']) {
-             option.series.push({
-                name: 'RSI',
-                type: 'line',
-                xAxisIndex: 1,
-                yAxisIndex: 1,
-                data: indicatorsData['RSI'],
-                symbol: 'none',
-                itemStyle: { color: '#fa8c16' }
-             })
-             hasSubChart = true
-        }
-        
-        if (indicatorsData['MACD']) {
-             // MACD usually has DIFF, DEA, HIST. My backend returns DIFF by default for "MACD".
-             // Assuming user wants simple line for now or I should have fetched 3 parts.
-             // Let's just show DIFF line.
-             option.series.push({
-                name: 'MACD',
-                type: 'line',
-                xAxisIndex: 1,
-                yAxisIndex: 1,
-                data: indicatorsData['MACD'],
-                symbol: 'none',
-                itemStyle: { color: '#1890ff' }
-             })
-             hasSubChart = true
-        }
-
-        if (indicatorsData['KDJ_K']) {
-              option.series.push(
-                 { name: 'K', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: indicatorsData['KDJ_K'], symbol: 'none', itemStyle: { color: '#eb2f96' } },
-                 { name: 'D', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: indicatorsData['KDJ_D'], symbol: 'none', itemStyle: { color: '#faad14' } },
-                 { name: 'J', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: indicatorsData['KDJ_J'], symbol: 'none', itemStyle: { color: '#722ed1' } }
-              )
-              hasSubChart = true
-         }
-         
+        // SUPPORT/RESISTANCE -> Main Chart
          if (indicatorsData['SUPPORT']) {
               option.series.push({
                   name: 'Support',
@@ -521,6 +728,109 @@ const loadChart = async () => {
                   lineStyle: { type: 'dashed', color: '#ef232a', width: 1.5 }
               })
          }
+
+        // Sub Chart Indicators
+        let hasSubChart = false
+        
+        if (indicatorsData['MACD']) {
+             hasSubChart = true
+             // DIF
+             option.series.push({
+                 name: 'DIF',
+                 type: 'line',
+                 xAxisIndex: 1,
+                 yAxisIndex: 1,
+                 data: indicatorsData['MACD'],
+                 smooth: true,
+                 symbol: 'none',
+                 lineStyle: { color: '#5470c6', width: 1.5 }
+             })
+             
+             // DEA
+             if (indicatorsData['MACD_DEA']) {
+                 option.series.push({
+                     name: 'DEA',
+                     type: 'line',
+                     xAxisIndex: 1,
+                     yAxisIndex: 1,
+                     data: indicatorsData['MACD_DEA'],
+                     smooth: true,
+                     symbol: 'none',
+                     lineStyle: { color: '#e6a23c', width: 1.5 }
+                 })
+             }
+             
+             // Histogram
+             if (indicatorsData['MACD_HIST']) {
+                 option.series.push({
+                     name: 'MACD',
+                     type: 'bar',
+                     xAxisIndex: 1,
+                     yAxisIndex: 1,
+                     data: indicatorsData['MACD_HIST'].map((v: number) => {
+                         return {
+                             value: v,
+                             itemStyle: {
+                                 color: v >= 0 ? '#ef232a' : '#14b143'
+                             }
+                         }
+                     }),
+                     barWidth: '50%'
+                 })
+             }
+        }
+        
+        if (indicatorsData['RSI']) {
+             hasSubChart = true
+             option.series.push({
+                 name: 'RSI',
+                 type: 'line',
+                 xAxisIndex: 1,
+                 yAxisIndex: 1,
+                 data: indicatorsData['RSI'],
+                 smooth: true,
+                 symbol: 'none',
+                 markLine: {
+                     data: [{ yAxis: 30 }, { yAxis: 70 }]
+                 }
+             })
+        }
+        
+        if (indicatorsData['KDJ_K'] && indicatorsData['KDJ_D'] && indicatorsData['KDJ_J']) {
+             hasSubChart = true
+             option.series.push(
+                 {
+                     name: 'K',
+                     type: 'line',
+                     xAxisIndex: 1,
+                     yAxisIndex: 1,
+                     data: indicatorsData['KDJ_K'],
+                     smooth: true,
+                     symbol: 'none',
+                     lineStyle: { width: 1, color: '#91cc75' }
+                 },
+                 {
+                     name: 'D',
+                     type: 'line',
+                     xAxisIndex: 1,
+                     yAxisIndex: 1,
+                     data: indicatorsData['KDJ_D'],
+                     smooth: true,
+                     symbol: 'none',
+                     lineStyle: { width: 1, color: '#fac858' }
+                 },
+                 {
+                     name: 'J',
+                     type: 'line',
+                     xAxisIndex: 1,
+                     yAxisIndex: 1,
+                     data: indicatorsData['KDJ_J'],
+                     smooth: true,
+                     symbol: 'none',
+                     lineStyle: { width: 1, color: '#ee6666' }
+                 }
+             )
+        }
         
          if (!hasSubChart) {
             // Hide bottom grid if no subchart indicators
@@ -532,11 +842,153 @@ const loadChart = async () => {
         }
         
         chart.setOption(option, true)
+        
+        // Update Side Panel Info
+        updateLatestIndicators(dates, values, indicatorsData)
     }
   } catch (e: any) {
     console.error('Load chart error:', e)
     ElMessage.error(e?.response?.data?.detail || '加载图表数据失败')
   }
+}
+
+const updateLatestIndicators = (dates: string[], values: any[], indicatorsData: any) => {
+    const lastIndex = dates.length - 1
+    if (lastIndex < 0) {
+        latestIndicators.value = []
+        return
+    }
+    
+    // Helper to find last valid value in a series, looking back up to 5 points
+    const getLastValidValue = (series: any[], currentIndex: number) => {
+        if (!series) return null
+        // Try current index first
+        if (series[currentIndex] !== null && series[currentIndex] !== undefined) {
+            return { value: series[currentIndex], index: currentIndex }
+        }
+        // Backtrack
+        for (let i = 1; i <= 5; i++) {
+            const idx = currentIndex - i
+            if (idx >= 0 && series[idx] !== null && series[idx] !== undefined) {
+                return { value: series[idx], index: idx }
+            }
+        }
+        return null
+    }
+    
+    const infos: any[] = []
+    
+    // 1. K-Line (Price)
+    const kData = values[lastIndex]
+    // [Open, Close, Low, High]
+    if (kData && kData.length >= 2) {
+        const close = kData[1]
+        const open = kData[0]
+        const change = close - open
+        const changePct = (change / open) * 100
+        const color = change >= 0 ? '#ef232a' : '#14b143'
+        
+        infos.push({
+            name: 'Price',
+            label: '最新价',
+            value: `${Number(close).toFixed(2)}`,
+            color: color,
+            desc: `收盘价: ${Number(close).toFixed(2)}，涨跌: ${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePct.toFixed(2)}%)`
+        })
+    }
+    
+    // 2. MA
+    const maData = getLastValidValue(indicatorsData['MA'], lastIndex)
+    if (maData) {
+        infos.push({
+            name: 'MA',
+            label: 'MA20',
+            value: Number(maData.value).toFixed(2),
+            color: '#5470c6',
+            desc: INDICATOR_EXPLANATIONS['MA']
+        })
+    }
+    
+    // 3. MACD
+    const macdData = getLastValidValue(indicatorsData['MACD'], lastIndex)
+    if (macdData) {
+        const idx = macdData.index
+        const dif = Number(indicatorsData['MACD'][idx]).toFixed(3)
+        let desc = INDICATOR_EXPLANATIONS['MACD']
+        let val = `DIF: ${dif}`
+        
+        if (indicatorsData['MACD_DEA'] && indicatorsData['MACD_DEA'][idx] !== null) {
+            const dea = Number(indicatorsData['MACD_DEA'][idx]).toFixed(3)
+            val += ` / DEA: ${dea}`
+        }
+        if (indicatorsData['MACD_HIST'] && indicatorsData['MACD_HIST'][idx] !== null) {
+             const hist = Number(indicatorsData['MACD_HIST'][idx]).toFixed(3)
+             val += ` / MACD: ${hist}`
+        }
+        
+        infos.push({
+            name: 'MACD',
+            label: 'MACD',
+            value: val, 
+            color: '#e6a23c',
+            desc: desc
+        })
+    }
+    
+    // 4. RSI
+    const rsiData = getLastValidValue(indicatorsData['RSI'], lastIndex)
+    if (rsiData) {
+        const rsi = Number(rsiData.value).toFixed(2)
+        infos.push({
+            name: 'RSI',
+            label: 'RSI',
+            value: rsi,
+            color: '#91cc75',
+            desc: INDICATOR_EXPLANATIONS['RSI']
+        })
+    }
+    
+    // 5. KDJ
+    const kdjKData = getLastValidValue(indicatorsData['KDJ_K'], lastIndex)
+    if (kdjKData) {
+        const idx = kdjKData.index
+        const k = Number(indicatorsData['KDJ_K'][idx]).toFixed(2)
+        const d = (indicatorsData['KDJ_D'] && indicatorsData['KDJ_D'][idx] !== null) ? Number(indicatorsData['KDJ_D'][idx]).toFixed(2) : '-'
+        const j = (indicatorsData['KDJ_J'] && indicatorsData['KDJ_J'][idx] !== null) ? Number(indicatorsData['KDJ_J'][idx]).toFixed(2) : '-'
+        
+        infos.push({
+            name: 'KDJ',
+            label: 'KDJ',
+            value: `K:${k} D:${d} J:${j}`,
+            color: '#ee6666',
+            desc: INDICATOR_EXPLANATIONS['KDJ']
+        })
+    }
+    
+    // 6. Support/Resistance
+    const supportData = getLastValidValue(indicatorsData['SUPPORT'], lastIndex)
+    if (supportData) {
+        infos.push({
+            name: 'SUPPORT',
+            label: '支撑位',
+            value: Number(supportData.value).toFixed(2),
+            color: '#14b143',
+            desc: INDICATOR_EXPLANATIONS['SUPPORT']
+        })
+    }
+    
+    const resistanceData = getLastValidValue(indicatorsData['RESISTANCE'], lastIndex)
+    if (resistanceData) {
+        infos.push({
+            name: 'RESISTANCE',
+            label: '压力位',
+            value: Number(resistanceData.value).toFixed(2),
+            color: '#ef232a',
+            desc: INDICATOR_EXPLANATIONS['RESISTANCE']
+        })
+    }
+    
+    latestIndicators.value = infos
 }
 
 const loadStatus = async () => {
@@ -619,7 +1071,12 @@ const deleteAlert = async (id: number) => {
 
 const formatTime = (t: string | null | undefined) => {
   if (!t) return '—'
-  return new Date(t).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+  // Treat naive date strings as UTC
+  let dateStr = t
+  if (!dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}/.test(dateStr)) {
+    dateStr += 'Z'
+  }
+  return new Date(dateStr).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
 }
 
 let timer: any = null
@@ -628,20 +1085,21 @@ onMounted(() => {
   nextTick(() => {
     initChart()
     loadChart()
+    initHistoryChart()
+    loadHistoryChart()
   })
   loadRealtimeStats()
   loadStatus()
   loadAlerts()
   loadForecast()
   loadNews()
-  globalThis.addEventListener('resize', () => chart && chart.resize())
+  globalThis.addEventListener('resize', () => {
+      if (chart) chart.resize()
+      if (historyChart) historyChart.resize()
+  })
   
   // Refresh data every 10 seconds to show real-time updates
   timer = setInterval(() => {
-    // Note: We do NOT refresh chart automatically here to avoid resetting user's zoom/view if they are interacting
-    // But for now, we keep it simple. If we want "Real-time Chart", we should only update if range is '1d'.
-    // However, user asked for stats to be independent.
-    // Let's keep updating chart for now, but stats update is separate.
     if (range.value === '1d') {
         loadChart()
     }
@@ -650,6 +1108,7 @@ onMounted(() => {
     loadStatus()
     loadAlerts()
     loadNews()
+    loadHistoryChart()
   }, 10000)
 })
 
@@ -657,6 +1116,10 @@ onUnmounted(() => {
   if (chart) {
     chart.dispose()
     chart = null
+  }
+  if (historyChart) {
+    historyChart.dispose()
+    historyChart = null
   }
   if (timer) {
     clearInterval(timer)
@@ -667,16 +1130,17 @@ onUnmounted(() => {
 
 <style scoped>
 .dashboard {
-  height: calc(100vh - 112px);
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  padding-bottom: 20px;
 }
 .stat-card {
   display: flex;
   align-items: center;
   border: none;
   height: 100%;
+  padding-left: 15px; /* Add left padding as requested */
 }
 .top-row {
   flex-shrink: 0;
@@ -692,14 +1156,13 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0;
+  padding: 0; /* Will be overridden by inline style if important not used */
 }
-:deep(.el-card__body) {
+.stat-card :deep(.el-card__body) {
   display: flex;
   align-items: center;
-  padding: 20px !important;
+  padding: 20px;
   width: 100%;
-  overflow: hidden;
 }
 
 .stat-icon-wrapper {
@@ -777,29 +1240,108 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  font-size: 16px;
-}
-.chart-controls {
-  display: flex;
-  gap: 16px;
-  align-items: center;
 }
 .chart {
   width: 100%;
   height: 100%;
 }
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 .bottom-row {
   flex: 2;
   min-height: 0;
-  margin-top: 0;
+}
+.news-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .news-title {
   font-weight: 500;
-  color: #333;
 }
 .news-time {
-  margin-left: 8px;
-  color: #999;
   font-size: 12px;
+  color: #8c8c8c;
+}
+
+.chart-info-panel {
+  width: 260px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-left: 1px solid #ebeef5;
+  overflow-y: auto;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.info-title {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #303133;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.info-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.info-item {
+  margin-bottom: 16px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.info-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.info-value {
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-weight: bold;
+  color: #606266;
+  font-size: 12px;
+}
+
+.info-desc {
+  color: #909399;
+  line-height: 1.5;
+  font-size: 12px;
+  text-align: justify;
+}
+
+.info-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #909399;
+  text-align: center;
+  padding: 20px;
 }
 </style>

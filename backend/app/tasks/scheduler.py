@@ -11,8 +11,24 @@ from app.tasks.jobs.market import job_fetch_realtime_data, job_fetch_hourly_data
 from app.tasks.jobs.analysis import job_calculate_indicators_1m, job_calculate_indicators_1h, job_calculate_indicators_1d
 from app.tasks.jobs.monitor import job_check_alerts
 from app.tasks.jobs.forecast import job_generate_forecast
+from app.services_impl.news_service_impl import NewsServiceImpl
+from app.dao.news_dao import NewsDAO
+from app.core.db import SessionLocal
 
 logger = logging.getLogger(__name__)
+
+def job_fetch_news():
+    """Fetch news periodically"""
+    db = SessionLocal()
+    try:
+        service = NewsServiceImpl(NewsDAO())
+        count = service.fetch_and_update(db)
+        if count > 0:
+            logger.info(f"Fetched {count} new news items")
+    except Exception as e:
+        logger.error(f"Error fetching news: {e}")
+    finally:
+        db.close()
 
 def run_startup_jobs():
     """在启动时立即执行一次所有任务。"""
@@ -35,6 +51,9 @@ def run_startup_jobs():
         job_calculate_indicators_1m()
         job_calculate_indicators_1h()
         job_calculate_indicators_1d()
+        
+        logger.info("启动：获取新闻")
+        job_fetch_news()
         
         logger.info("启动：生成预测")
         job_generate_forecast()
@@ -71,6 +90,14 @@ def create_scheduler() -> BackgroundScheduler:
         job_fetch_daily_data,
         CronTrigger(hour=2, minute=0),
         id="daily_data_fetch",
+        replace_existing=True
+    )
+
+    # 新闻：每1小时
+    scheduler.add_job(
+        job_fetch_news,
+        IntervalTrigger(hours=1),
+        id="news_fetch",
         replace_existing=True
     )
     

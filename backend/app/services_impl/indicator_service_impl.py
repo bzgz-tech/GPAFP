@@ -107,30 +107,42 @@ class IndicatorServiceImpl(IndicatorService):
                 df["value"] = diff
                 
         elif base_name == "KDJ":
-            # KDJ (9, 3, 3)
-            low_list = df['low'].rolling(window=9, min_periods=9).min()
-            high_list = df['high'].rolling(window=9, min_periods=9).max()
+            # Default parameters
+            n, m1, m2 = 9, 3, 3
+            
+            # Try to parse custom parameters from name
+            # Expected formats: KDJ_K, KDJ_9_3_3_K
+            digits = [int(p) for p in parts if p.isdigit()]
+            if len(digits) >= 3:
+                n, m1, m2 = digits[0], digits[1], digits[2]
+
+            # KDJ calculation
+            low_list = df['low'].rolling(window=n, min_periods=n).min()
+            high_list = df['high'].rolling(window=n, min_periods=n).max()
             rsv = (df['close'] - low_list) / (high_list - low_list) * 100
             
-            # K = 2/3 * PrevK + 1/3 * RSV
-            # D = 2/3 * PrevD + 1/3 * K
-            # J = 3 * K - 2 * D
-            # Pandas ewm adjust=False corresponds to this recursion roughly if alpha=1/3
-            # com = 2 means alpha = 1 / (1 + com) = 1/3
+            # com = 1 / alpha - 1
+            # alpha = 1 / M
+            # com = M - 1
+            com_k = m1 - 1
+            com_d = m2 - 1
             
-            k = rsv.ewm(com=2, adjust=False).mean()
-            d = k.ewm(com=2, adjust=False).mean()
+            k = rsv.ewm(com=com_k, adjust=False).mean()
+            d = k.ewm(com=com_d, adjust=False).mean()
             j = 3 * k - 2 * d
             
-            if "K" in name and "KDJ" in name: # KDJ_K
+            if "K" in parts: # Check parts list for component
                 df["value"] = k
-            elif "D" in name: # KDJ_D
+            elif "D" in parts:
                 df["value"] = d
-            elif "J" in name: # KDJ_J
+            elif "J" in parts:
                 df["value"] = j
             else:
-                # Default to K if just "KDJ" requested, though usually specific component is needed
-                df["value"] = k
+                # Default fallback if ambiguous
+                if "K" in name: df["value"] = k
+                elif "D" in name: df["value"] = d
+                elif "J" in name: df["value"] = j
+                else: df["value"] = k
 
         elif base_name == "SUPPORT":
             period = param if param else 20

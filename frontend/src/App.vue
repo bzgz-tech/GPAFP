@@ -4,7 +4,7 @@
       <el-header class="app-header">
         <div class="left">
           <div class="logo">
-            <el-icon :size="24" class="logo-icon"><GoldMedal /></el-icon>
+            <img :src="logoUrl" class="logo-icon" alt="Logo" />
             <span class="brand">黄金分析平台</span>
           </div>
           <el-menu
@@ -50,7 +50,8 @@
 import { computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store'
-import { GoldMedal, ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown } from '@element-plus/icons-vue'
+import logoUrl from '@/assets/logo.svg'
 
 const router = useRouter()
 const route = useRoute()
@@ -122,6 +123,8 @@ html, body {
 }
 
 .logo-icon {
+  width: 32px;
+  height: 32px;
   color: #faad14;
 }
 

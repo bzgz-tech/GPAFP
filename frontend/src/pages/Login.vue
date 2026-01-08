@@ -2,7 +2,7 @@
   <div class="login-container">
     <div class="login-content">
       <div class="login-header">
-        <el-icon :size="48" class="logo-icon"><GoldMedal /></el-icon>
+        <img :src="logoUrl" class="logo-icon" alt="Logo" />
         <h1 class="app-title">黄金价格分析与预测平台</h1>
         <p class="app-subtitle">专业的市场数据分析与趋势预测工具</p>
       </div>
@@ -102,7 +102,8 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
 import api from '@/services/api'
 import { ElMessage } from 'element-plus'
-import { User, Lock, GoldMedal, Picture } from '@element-plus/icons-vue'
+import { User, Lock, Picture } from '@element-plus/icons-vue'
+import logoUrl from '@/assets/logo.svg'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -170,7 +171,7 @@ const registerRules = {
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
     {
-      validator: (rule: any, value: string, callback: any) => {
+      validator: (_rule: any, value: string, callback: any) => {
         if (value !== registerForm.password) {
           callback(new Error('两次输入的密码不一致'))
         } else {
@@ -200,7 +201,7 @@ const changePwdRules = {
   confirmNewPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
     {
-      validator: (rule: any, value: string, callback: any) => {
+      validator: (_rule: any, value: string, callback: any) => {
         if (value !== changePwdForm.newPassword) {
           callback(new Error('两次输入的密码不一致'))
         } else {
@@ -323,13 +324,6 @@ const onChangePassword = async () => {
   }
 }
 
-const onReset = () => {
-  form.username = ''
-  form.password = ''
-  if (formRef.value) {
-    formRef.value.resetFields()
-  }
-}
 </script>
 
 <style scoped>
@@ -354,7 +348,8 @@ const onReset = () => {
 }
 
 .logo-icon {
-  color: #faad14;
+  width: 64px;
+  height: 64px;
   margin-bottom: 16px;
 }
 
