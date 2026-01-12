@@ -21,7 +21,16 @@ class Settings(BaseSettings):
     api_v1_str: str = ""
     backend_cors_origins: list[str] = []
     access_token_expire_minutes: int = 60
-    model_config = SettingsConfigDict(env_file=None)
+    
+    # LLM Settings
+    # 推荐使用 DeepSeek (深度求索) 或 Moonshot (Kimi)，兼容 OpenAI 格式且国内可用
+    llm_api_key: str = "" 
+    llm_base_url: str = "" # 示例: DeepSeek API 地址
+    llm_model: str = "" # 示例: deepseek-chat, gpt-3.5-turbo
+    llm_chat_path: str = "chat/completions" # 对话接口路径
+    
+    
+    model_config = SettingsConfigDict(env_file=None, extra="ignore")
 
 
 settings = Settings()

@@ -6,6 +6,7 @@ from app.services_impl.auth_service_impl import AuthServiceImpl
 from app.schemas.auth import Token, UserCreate, UserDTO, UserLogin, UserChangePassword
 from app.models.user import User
 from app.core.captcha_store import captcha_service
+from app.core.security import verify_password
 from fastapi import Form
 import base64
 
@@ -27,32 +28,59 @@ def get_captcha():
 @router.post("/login", response_model=Token)
 def login_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    captcha_id: str = Form(...),
-    captcha_code: str = Form(...),
+    captcha_id: str = Form(None),
+    captcha_code: str = Form(None),
     db: Session = Depends(get_db),
 ):
     """
     用户登录接口，获取访问令牌。
-    需提供验证码。
+    连续登录失败3次后需提供验证码。
     """
-    # 验证验证码
-    if not captcha_service.verify_captcha(captcha_id, captcha_code):
-        raise HTTPException(
-            status_code=400,
-            detail="验证码错误或已过期",
-        )
-
     service = AuthServiceImpl(db)
-    # 验证用户凭证
-    user = service.authenticate_user(UserLogin(username=form_data.username, password=form_data.password))
+    user = service.dao.find_by_username(db, form_data.username)
+
+    # 1. Check user existence
     if not user:
+        # 为了安全，这里不应该暴露用户是否存在，但为了逻辑简单，先返回统一错误
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    # 创建并返回访问令牌
-    return service.create_access_token(user)
+
+    # 2. Check failed attempts (Threshold: 3)
+    if user.failed_login_attempts >= 3:
+        if not captcha_id or not captcha_code:
+            raise HTTPException(
+                status_code=400,
+                detail="Require Captcha",
+            )
+        if not captcha_service.verify_captcha(captcha_id, captcha_code):
+            raise HTTPException(
+                status_code=400,
+                detail="验证码错误或已过期",
+            )
+
+    # 3. Verify password
+    if not verify_password(form_data.password, user.hashed_password):
+        user.failed_login_attempts += 1
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或密码错误",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 4. Check active status
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+
+    # 5. Success - Reset attempts
+    if user.failed_login_attempts > 0:
+        user.failed_login_attempts = 0
+        db.commit()
+
+    return service.create_access_token(UserDTO.model_validate(user))
 
 @router.post("/register", response_model=UserDTO)
 def register_user(

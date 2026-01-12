@@ -22,7 +22,7 @@
           <el-form-item prop="password">
             <el-input v-model="form.password" type="password" placeholder="密码" show-password :prefix-icon="Lock" />
           </el-form-item>
-          <el-form-item>
+          <el-form-item v-if="showCaptcha">
             <div class="captcha-row">
               <el-input v-model="captchaCode" placeholder="验证码" :prefix-icon="Picture" />
               <div class="captcha-img" @click="fetchCaptcha" title="点击刷新验证码">
@@ -109,6 +109,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 // Captcha
+const showCaptcha = ref(false)
 const captchaUrl = ref('')
 const captchaId = ref('')
 const captchaCode = ref('')
@@ -225,7 +226,7 @@ const onSubmit = async () => {
   if (formRef.value) {
     await formRef.value.validate()
   }
-  if (!captchaCode.value) {
+  if (showCaptcha.value && !captchaCode.value) {
     ElMessage.warning('请输入验证码')
     return
   }
@@ -234,8 +235,10 @@ const onSubmit = async () => {
     const params = new URLSearchParams()
     params.append('username', form.username)
     params.append('password', form.password)
-    params.append('captcha_id', captchaId.value)
-    params.append('captcha_code', captchaCode.value)
+    if (showCaptcha.value) {
+      params.append('captcha_id', captchaId.value)
+      params.append('captcha_code', captchaCode.value)
+    }
     
     const response = await api.post('/auth/login', params)
     userStore.setToken(response.data.access_token)
@@ -247,9 +250,19 @@ const onSubmit = async () => {
     ElMessage.success('登录成功')
     router.push('/')
   } catch (error: any) {
-    ElMessage.error(error?.response?.data?.detail || '登录失败')
-    fetchCaptcha()
-    captchaCode.value = ''
+    const detail = error?.response?.data?.detail
+    if (error?.response?.status === 400 && detail === 'Require Captcha') {
+      showCaptcha.value = true
+      fetchCaptcha()
+      ElMessage.warning('为了您的账号安全，请输入验证码')
+    } else {
+      ElMessage.error(detail || '登录失败')
+      // If we are already showing captcha, refresh it on error
+      if (showCaptcha.value) {
+        fetchCaptcha()
+        captchaCode.value = ''
+      }
+    }
   } finally {
     loading.value = false
   }

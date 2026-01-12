@@ -68,14 +68,20 @@ class MarketServiceImpl(MarketService):
         
         # 调用外部导入器获取原始数据
         raw = fetch_prices(symbol, interval, final_window)
+        if not raw:
+            return 0
+            
+        # 获取已有数据的时间戳，用于去重（支持回填和追加）
+        min_ts = raw[0]["ts"]
+        max_ts = raw[-1]["ts"]
+        existing = self.price_dao.get_range(db, symbol, timeframe, min_ts, max_ts)
+        existing_ts = {p.ts.replace(tzinfo=None) for p in existing}
         
-        # 获取数据库中已有的最新时间戳，用于去重
-        max_ts = self.price_dao.get_max_ts(db, symbol, timeframe)
         rows: list[Price] = []
         
         for r in raw:
             # 跳过已存在的记录
-            if max_ts and r["ts"] <= max_ts:
+            if r["ts"].replace(tzinfo=None) in existing_ts:
                 continue
             rows.append(
                 Price(

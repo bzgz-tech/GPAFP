@@ -95,6 +95,13 @@ npm run dev
 - **用户名**: `admin`
 - **密码**: `Admin123!`
 
+## 💻 开发指南
+
+### Git 提交规范
+由于网络环境限制，推送到 GitHub 时需指定本地代理：
+```bash
+git -c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890 push
+```
 
 ## 📄 许可证
 [MIT License](LICENSE)

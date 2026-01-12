@@ -98,5 +98,34 @@ def read_forecast_history(
             "value": round(r.value * ratio, 2), 
             "lower": round(r.lower * ratio, 2) if r.lower is not None else None, 
             "upper": round(r.upper * ratio, 2) if r.upper is not None else None
-        } for r in rows
+        }
+        for r in rows
     ]
+
+@router.get("/predict")
+def predict_price(
+    symbol: str = "XAUUSD", 
+    days: int = 7,
+    usd_cny: float = 7.1, 
+    db: Session = Depends(get_db)
+):
+    """
+    On-demand prediction for next N days using AR model.
+    Returns CNY/g values (consistent with other APIs).
+    """
+    service = ForecastServiceImpl(ForecastDAO(), PriceDAO())
+    results = service.predict_next_days(db, symbol, days)
+    
+    # Convert to CNY/g
+    ratio = usd_cny / 31.1034768
+    
+    converted = []
+    for r in results:
+                converted.append({
+                    "ts": r["ts"],
+            "value": round(r["value"] * ratio, 2),
+            "lower": round(r["lower"] * ratio, 2) if r["lower"] else None,
+            "upper": round(r["upper"] * ratio, 2) if r["upper"] else None,
+            "accuracy": r["accuracy"]
+        })
+    return converted

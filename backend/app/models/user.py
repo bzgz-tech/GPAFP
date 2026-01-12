@@ -10,3 +10,4 @@ class User(Base):
     email = Column(String(128), unique=True, index=True, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, nullable=False)
+    failed_login_attempts = Column(Integer, default=0)

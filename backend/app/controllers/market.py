@@ -36,8 +36,12 @@ def read_latest_price(
         if result.ts.tzinfo is None:
             result.ts = result.ts.replace(tzinfo=timezone.utc)
         
-        # 换算系数：美元/盎司 -> 人民币/克
-        ratio = usd_cny / 31.1034768
+        # 换算系数：美元/盎司 -> 人民币/克 (仅针对 XAUUSD)
+        if symbol == "XAUUSD":
+            ratio = usd_cny / 31.1034768
+        else:
+            ratio = 1.0
+            
         return PriceOut(
             id=result.id,
             symbol=result.symbol,
@@ -74,15 +78,28 @@ def read_history(
         list[PricePointOut]: 历史价格点列表。
     """
     now = datetime.utcnow()
-    days_map = {"1d": 1, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
+    days_map = {"1d": 1, "1m": 30, "3m": 90, "6m": 180, "1y": 365, "5y": 365 * 5}
     days = days_map.get(window, 30)
     start_ts = now - timedelta(days=days)
     
     service = MarketServiceImpl(PriceDAO())
     rows = service.get_history(db, symbol, timeframe, start_ts)
     
-    # Auto-import if no data found
+    # Check if we need to import data (missing or incomplete)
+    should_import = False
     if not rows:
+        should_import = True
+    elif days > 30: # Check for gaps in longer history
+        first_ts = rows[0].ts.replace(tzinfo=None)
+        # If data starts significantly later than requested start time (allow 15 days buffer)
+        start_gap = (first_ts - start_ts).days > 15
+        count_gap = len(rows) < (days * 0.4)
+        
+        if start_gap or count_gap:
+            should_import = True
+
+    # Auto-import if needed
+    if should_import:
         try:
             # Determine appropriate window based on timeframe
             import_window = window
@@ -93,7 +110,10 @@ def read_history(
         except Exception as e:
              print(f"Auto-import failed: {e}")
 
-    ratio = usd_cny / 31.1034768
+    if symbol == "XAUUSD":
+        ratio = usd_cny / 31.1034768
+    else:
+        ratio = 1.0
     return [{"ts": r.ts.replace(tzinfo=timezone.utc), "value": round(r.close * ratio, 2), "created_at": r.created_at} for r in rows]
 
 @router.get("/history/detailed", response_model=list[PriceDetailedOut])
@@ -119,15 +139,26 @@ def read_detailed_history(
         list[PriceDetailedOut]: 详细历史价格列表。
     """
     now = datetime.utcnow()
-    days_map = {"1d": 1, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
+    days_map = {"1d": 1, "1m": 30, "3m": 90, "6m": 180, "1y": 365, "5y": 365 * 5}
     days = days_map.get(window, 30)
     start_ts = now - timedelta(days=days)
     
     service = MarketServiceImpl(PriceDAO())
     rows = service.get_history(db, symbol, timeframe, start_ts)
     
-    # Auto-import if no data found
+    # Check if we need to import data
+    should_import = False
     if not rows:
+        should_import = True
+    elif days > 30:
+        first_ts = rows[0].ts.replace(tzinfo=None)
+        start_gap = (first_ts - start_ts).days > 15
+        count_gap = len(rows) < (days * 0.4)
+        if start_gap or count_gap:
+            should_import = True
+
+    # Auto-import if needed
+    if should_import:
         try:
             # Determine appropriate window based on timeframe
             import_window = window
@@ -141,7 +172,10 @@ def read_detailed_history(
     # 倒序排列，方便前端表格展示
     rows.reverse()
     
-    ratio = usd_cny / 31.1034768
+    if symbol == "XAUUSD":
+        ratio = usd_cny / 31.1034768
+    else:
+        ratio = 1.0
     
     result = []
     for r in rows:

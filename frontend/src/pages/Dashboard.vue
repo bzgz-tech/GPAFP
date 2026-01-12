@@ -34,9 +34,21 @@
             <el-icon><Aim /></el-icon>
           </div>
           <div class="stat-content">
-            <div class="stat-title">次日预测</div>
+            <div class="stat-title">
+                AI预测 (7日)
+                <el-popover placement="right" title="7日预测 (ARIMA)" :width="300" trigger="hover">
+                    <template #reference>
+                      <el-icon style="margin-left: 5px; cursor: pointer"><InfoFilled /></el-icon>
+                    </template>
+                    <el-table :data="forecastList" size="small">
+                        <el-table-column property="date" label="日期" width="100"></el-table-column>
+                        <el-table-column property="range" label="区间 (元)"></el-table-column>
+                        <el-table-column property="accuracy" label="置信度"></el-table-column>
+                    </el-table>
+                </el-popover>
+            </div>
             <div class="stat-value">{{ nextDayForecast }} <span class="unit">元/克</span></div>
-            <div class="stat-time" v-if="forecastTime">{{ forecastTime }}</div>
+            <div class="stat-time" v-if="forecastTime" style="font-size: 10px;">{{ forecastTime }}</div>
           </div>
         </el-card>
       </el-col>
@@ -61,13 +73,17 @@
             <el-icon><TrendCharts /></el-icon>
             <span>历史价格走势图</span>
           </div>
-          <el-radio-group v-model="historyRange" size="small" @change="loadHistoryChart">
-            <el-radio-button label="1d">今日</el-radio-button>
-            <el-radio-button label="1m">1月</el-radio-button>
-            <el-radio-button label="3m">3月</el-radio-button>
-            <el-radio-button label="6m">6月</el-radio-button>
-            <el-radio-button label="1y">1年</el-radio-button>
-          </el-radio-group>
+          <div style="display: flex; align-items: center;">
+            <el-checkbox v-model="showEvents" size="small" border style="margin-right: 10px;" @change="loadHistoryChart">重大事件</el-checkbox>
+            <el-radio-group v-model="historyRange" size="small" @change="loadHistoryChart">
+              <el-radio-button label="1d">今日</el-radio-button>
+              <el-radio-button label="1m">1月</el-radio-button>
+              <el-radio-button label="3m">3月</el-radio-button>
+              <el-radio-button label="6m">6月</el-radio-button>
+              <el-radio-button label="1y">1年</el-radio-button>
+              <el-radio-button label="5y">5年</el-radio-button>
+            </el-radio-group>
+          </div>
         </div>
       </template>
       <div ref="historyChartRef" class="chart" style="height: 400px;"></div>
@@ -81,6 +97,15 @@
             <span>K线走势</span>
           </div>
           <div class="chart-controls">
+            <el-button type="primary" size="small" @click="handleAIAnalysis" :loading="aiLoading" style="margin-right: 10px;">
+                <el-icon><Monitor /></el-icon> AI 智能分析
+            </el-button>
+            <el-checkbox-group v-model="selectedLinkage" size="small" @change="loadChart" style="margin-right: 10px">
+              <el-checkbox-button label="DX-Y.NYB">美元</el-checkbox-button>
+              <el-checkbox-button label="^TNX">美债</el-checkbox-button>
+              <el-checkbox-button label="CL=F">原油</el-checkbox-button>
+            </el-checkbox-group>
+
             <el-checkbox-group v-model="selectedIndicators" size="small" @change="loadChart">
               <el-checkbox-button label="MA">MA</el-checkbox-button>
               <el-checkbox-button label="MACD">MACD</el-checkbox-button>
@@ -99,6 +124,15 @@
             <el-button link size="small" @click="openSettingsDialog" style="margin-left: 10px">
                 <el-icon><Setting /></el-icon>
             </el-button>
+            <el-dropdown split-button type="primary" size="small" @click="saveTemplate" @command="applyTemplate" style="margin-left: 10px">
+              保存模板
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item v-for="t in savedTemplates" :key="t.name" :command="t">{{ t.name }}</el-dropdown-item>
+                  <el-dropdown-item divided command="clear">重置</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </div>
       </template>
@@ -268,6 +302,22 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- AI Report Dialog -->
+    <el-dialog v-model="showAIReport" title="AI 市场分析报告" width="60%">
+      <div class="ai-report-content" v-loading="aiLoading">
+        <div v-if="aiReportContent" style="white-space: pre-wrap; line-height: 1.6; font-size: 16px;">
+          {{ aiReportContent }}
+        </div>
+        <el-empty v-else description="暂无报告，请点击生成" />
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showAIReport = false">关闭</el-button>
+          <el-button type="primary" @click="fetchAIReport" :loading="aiLoading">重新生成</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -276,21 +326,25 @@ import { ref, onMounted, computed, reactive, nextTick, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import api from '@/services/api'
 import { formatChartTooltip, INDICATOR_EXPLANATIONS } from '@/utils/chartTooltip'
-import { ElMessage } from 'element-plus'
-import { Money, TrendCharts, Aim, Bell, Histogram, Timer, Plus, Delete, Reading, Setting, InfoFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Money, TrendCharts, Aim, Bell, Histogram, Timer, Plus, Delete, Reading, Setting, InfoFilled, Monitor } from '@element-plus/icons-vue'
 
 const chartRef = ref<HTMLElement | null>(null)
 let chart: echarts.ECharts | null = null
 const historyChartRef = ref<HTMLElement | null>(null)
 let historyChart: echarts.ECharts | null = null
-const historyRange = ref<'1d' | '1m' | '3m' | '6m' | '1y'>('1d')
+const historyRange = ref<'1d' | '1m' | '3m' | '6m' | '1y' | '5y'>('1d')
 const range = ref<'1m' | '5m' | '15m' | '1h' | '1d'>('1d')
 const selectedIndicators = ref<string[]>(['MA'])
+const selectedLinkage = ref<string[]>([])
+const showEvents = ref(false)
+const savedTemplates = ref<any[]>([])
 const latestIndicators = ref<any[]>([])
 const latestDisplay = ref('—')
 const latestTime = ref('')
 const nextDayForecast = ref('—')
 const forecastTime = ref('')
+const forecastList = ref<any[]>([])
 const dailyChange = ref('—')
 const dailyChangeTime = ref('')
 const status = ref<any>({})
@@ -309,6 +363,42 @@ const settingsVisible = ref(false)
 const indicatorSettings = reactive({
     KDJ: { n: 9, m1: 3, m2: 3 }
 })
+
+const MAJOR_EVENTS = [
+    { date: '2020-03-16', name: '降息至0', desc: '疫情冲击' },
+    { date: '2020-08-07', name: '历史新高', desc: '突破2075' },
+    { date: '2022-03-16', name: '首次加息', desc: '紧缩周期' },
+    { date: '2023-10-07', name: '巴以冲突', desc: '避险升温' },
+    { date: '2024-09-18', name: '降息50BP', desc: '降息周期' }
+]
+
+const saveTemplate = () => {
+    ElMessageBox.prompt('请输入模板名称', '保存模板', {
+        confirmButtonText: '保存',
+        cancelButtonText: '取消',
+    }).then(({ value }) => {
+        if (!value) return
+        const tpl = {
+            name: value,
+            indicators: [...selectedIndicators.value],
+            linkage: [...selectedLinkage.value]
+        }
+        savedTemplates.value.push(tpl)
+        localStorage.setItem('analysisTemplates', JSON.stringify(savedTemplates.value))
+        ElMessage.success('模板保存成功')
+    }).catch(() => {})
+}
+
+const applyTemplate = (cmd: any) => {
+    if (cmd === 'clear') {
+        selectedIndicators.value = []
+        selectedLinkage.value = []
+    } else {
+        selectedIndicators.value = [...cmd.indicators]
+        selectedLinkage.value = cmd.linkage ? [...cmd.linkage] : []
+    }
+    loadChart()
+}
 
 const openSettingsDialog = () => {
     settingsVisible.value = true
@@ -467,7 +557,25 @@ const loadHistoryChart = async () => {
                           { offset: 1, color: 'rgba(64, 158, 255, 0.1)' }
                         ])
                     },
-                    itemStyle: { color: '#409EFF' }
+                    itemStyle: { color: '#409EFF' },
+                    markPoint: showEvents.value ? {
+                        symbol: 'pin',
+                        symbolSize: 40,
+                        data: MAJOR_EVENTS.map(e => {
+                            // Skip if event is before data start
+                            if (dates.length === 0 || e.date < dates[0].split('T')[0]) return null
+                            
+                            // Find nearest trading day (>= event date)
+                            const idx = dates.findIndex((d: string) => d >= e.date)
+                            if (idx === -1) return null
+                            return {
+                                name: e.name,
+                                coord: [idx, values[idx]],
+                                value: e.name,
+                                label: { show: true, fontSize: 10 }
+                            }
+                        }).filter(x => x !== null)
+                    } : undefined
                 }
             ]
         }
@@ -637,6 +745,38 @@ const loadChart = async () => {
         }
     }
 
+    // Fetch Linkage Data
+    const linkageSeries = []
+    const linkNameMap: any = { 'DX-Y.NYB': '美元指数', '^TNX': '美债收益率', 'CL=F': '原油' }
+    if (selectedLinkage.value.length > 0) {
+        for (const linkSym of selectedLinkage.value) {
+            try {
+                const { data: linkData } = await api.get('/market/history/detailed', {
+                    params: { symbol: linkSym, timeframe, window: windowStr }
+                })
+                const map = new Map()
+                linkData.forEach((d: any) => map.set(new Date(d.ts).getTime(), d.close))
+                const series = dates.map((d: string) => map.get(new Date(d).getTime()) || null)
+                
+                // Normalize to percentage change based on first valid value in visible range
+                const firstVal = series.find(v => v !== null)
+                const normalized = series.map(v => v !== null && firstVal ? ((v - firstVal) / firstVal * 100) : null)
+                
+                linkageSeries.push({
+                    name: linkNameMap[linkSym] || linkSym,
+                    type: 'line',
+                    yAxisIndex: 2, // Use the new Right Axis
+                    showSymbol: false,
+                    data: normalized,
+                    smooth: true,
+                    lineStyle: { width: 1.5 }
+                })
+            } catch (e) {
+                console.error(`Failed to load linkage ${linkSym}`, e)
+            }
+        }
+    }
+
     if (!chart && chartRef.value) initChart()
     
     if (chart) {
@@ -667,12 +807,40 @@ const loadChart = async () => {
                  { left: '3%', right: '3%', top: '75%', height: '20%' }
              ],
              xAxis: [
-                 { type: 'category', data: dates.map((d: string) => new Date(d).toLocaleString()), scale: true, boundaryGap: false, gridIndex: 0, axisLabel: { show: false } },
-                 { type: 'category', data: dates.map((d: string) => new Date(d).toLocaleString()), scale: true, boundaryGap: false, gridIndex: 1 }
+                 { 
+                    type: 'category', 
+                    data: dates, 
+                    scale: true, 
+                    boundaryGap: false, 
+                    gridIndex: 0, 
+                    axisLabel: { show: false } 
+                 },
+                 { 
+                    type: 'category', 
+                    data: dates, 
+                    scale: true, 
+                    boundaryGap: false, 
+                    gridIndex: 1,
+                    axisLabel: {
+                        formatter: (val: string) => {
+                            const d = new Date(val)
+                            return `${d.getMonth()+1}-${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`
+                        }
+                    }
+                 }
              ],
              yAxis: [
-                 { scale: true, gridIndex: 0, splitLine: { show: false } },
-                 { scale: true, gridIndex: 1, splitLine: { show: false } }
+                 { scale: true, gridIndex: 0, splitLine: { show: false } }, // Main Left
+                 { scale: true, gridIndex: 1, splitLine: { show: false } }, // Indicator Left
+                 { 
+                    show: selectedLinkage.value.length > 0,
+                    scale: true, 
+                    gridIndex: 0, 
+                    position: 'right', 
+                    splitLine: { show: false },
+                    axisLabel: { formatter: '{value}%' },
+                    name: '关联(%)'
+                 } // Main Right
              ],
              dataZoom: [
                  { type: 'inside', xAxisIndex: [0, 1], start: zoomStart, end: zoomEnd }, 
@@ -688,8 +856,23 @@ const loadChart = async () => {
                          color0: '#14b143',
                          borderColor: '#ef232a',
                          borderColor0: '#14b143'
-                     }
-                 }
+                     },
+                     markPoint: showEvents.value ? {
+                         symbol: 'pin',
+                         symbolSize: 40,
+                         data: MAJOR_EVENTS.map(e => {
+                             const idx = dates.findIndex((d: string) => d.startsWith(e.date))
+                             if (idx === -1) return null
+                             return {
+                                 name: e.name,
+                                 coord: [idx, values[idx][1]],
+                                 value: e.name,
+                                 label: { show: true, fontSize: 10 }
+                             }
+                         }).filter(x => x !== null)
+                     } : undefined
+                 },
+                 ...linkageSeries
              ]
         }
         
@@ -1011,19 +1194,19 @@ const loadNews = async () => {
 
 const loadForecast = async () => {
   try {
-    const { data } = await api.get('/forecast/latest', {
-      params: { symbol: 'XAUUSD', timeframe: '1d', horizon: 1 }
+    const { data } = await api.get('/forecast/predict', {
+      params: { symbol: 'XAUUSD', days: 7 }
     })
-    if (data && data.value) {
-      nextDayForecast.value = Number(data.value).toFixed(2)
-      if (data.ts) {
-        const date = new Date(data.ts)
-        const month = (date.getMonth() + 1).toString().padStart(2, '0')
-        const day = date.getDate().toString().padStart(2, '0')
-        const hours = date.getHours().toString().padStart(2, '0')
-        const minutes = date.getMinutes().toString().padStart(2, '0')
-        forecastTime.value = `${month}-${day} ${hours}:${minutes}`
-      }
+    if (data && data.length > 0) {
+      const next = data[0]
+      nextDayForecast.value = `${Number(next.value).toFixed(2)}`
+      forecastTime.value = `区间: ${Number(next.lower).toFixed(0)} - ${Number(next.upper).toFixed(0)}`
+      
+      forecastList.value = data.map((d: any) => ({
+          date: new Date(d.ts).toLocaleDateString(),
+          range: `${Number(d.lower).toFixed(0)} - ${Number(d.upper).toFixed(0)}`,
+          accuracy: d.accuracy || 'Medium'
+      }))
     }
   } catch (e) {
     console.error('Load forecast error:', e)
@@ -1081,7 +1264,46 @@ const formatTime = (t: string | null | undefined) => {
 
 let timer: any = null
 
+// AI Analysis Logic
+const aiLoading = ref(false)
+const showAIReport = ref(false)
+const aiReportContent = ref('')
+
+const handleAIAnalysis = async () => {
+    showAIReport.value = true
+    if (!aiReportContent.value) {
+        await fetchAIReport()
+    }
+}
+
+const fetchAIReport = async () => {
+    aiLoading.value = true
+    aiReportContent.value = ''
+    try {
+        const res = await api.get('/analysis/ai_report', {
+            params: {
+                symbol: 'XAUUSD',
+                timeframe: range.value
+            },
+            timeout: 120000 // 2 minutes timeout for AI report
+        })
+        aiReportContent.value = res.data.report
+    } catch (err) {
+        console.error(err)
+        ElMessage.error('获取AI分析报告失败')
+        aiReportContent.value = '分析服务暂时不可用，请稍后重试。'
+    } finally {
+        aiLoading.value = false
+    }
+}
+
 onMounted(() => {
+  const saved = localStorage.getItem('analysisTemplates')
+  if (saved) {
+      try {
+          savedTemplates.value = JSON.parse(saved)
+      } catch(e) {}
+  }
   nextTick(() => {
     initChart()
     loadChart()

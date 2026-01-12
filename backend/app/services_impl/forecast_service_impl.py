@@ -5,7 +5,7 @@ from ..dao.price_dao import PriceDAO
 from ..models.forecast import Forecast
 import pandas as pd
 import numpy as np
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 class ForecastServiceImpl(ForecastService):
     """
@@ -57,37 +57,85 @@ class ForecastServiceImpl(ForecastService):
             rows = self.forecast_dao.get_range(db, symbol, timeframe, horizon, start_ts, end_ts)
         return rows
 
-    def predict_next_days(self, db: Session, symbol: str, days: int = 5) -> list[dict]:
+    def predict_next_days(self, db: Session, symbol: str, days: int = 7) -> list[dict]:
         """
-        预测未来几天的价格趋势
+        基于简化的自回归 (AR) 模型预测未来价格。
+        返回包含预测值、置信区间的列表。
         """
-        # 获取最新的历史数据
-        prices = self.price_dao.get_range(db, symbol, "1d", start_ts=None)
-        if not prices or len(prices) < 10:
-            return []
+        # 1. 获取足够的历史数据用于训练 (例如最近 120 天)
+        prices = self.price_dao.get_range(db, symbol, "1d", start_ts=datetime.utcnow() - timedelta(days=200))
+        if not prices or len(prices) < 30:
+             return [] # 数据不足
+        
+        # 按时间排序
+        prices.sort(key=lambda x: x.ts)
+        
+        # 提取收盘价
+        data = np.array([p.close for p in prices])
+        dates = [p.ts for p in prices]
+        
+        # 简单 AR(p) 模型, p=5 (考虑一周交易日效应)
+        lag = 5
+        if len(data) <= lag + 5:
+             return []
 
-        df = pd.DataFrame([{"ts": p.ts, "close": p.close} for p in prices])
-        df.sort_values("ts", inplace=True)
+        # 构造 X 和 y
+        # y = [x_t], X = [1, x_{t-1}, ..., x_{t-p}]
+        X = []
+        y = []
+        for i in range(lag, len(data)):
+            row = [1.0] # bias
+            for j in range(1, lag + 1):
+                row.append(data[i-j])
+            X.append(row)
+            y.append(data[i])
+            
+        X = np.array(X)
+        y = np.array(y)
         
-        # 简单预测算法：基于最近5天的平均涨跌幅
-        df['change'] = df['close'].pct_change()
-        avg_change = df['change'].tail(5).mean()
+        # 最小二乘法求解系数
+        # coeffs: [intercept, w1, ..., wp]
+        coeffs, residuals, rank, s = np.linalg.lstsq(X, y, rcond=None)
         
-        last_price = df['close'].iloc[-1]
-        last_date = df['ts'].iloc[-1]
-        
+        # 计算残差标准差
+        if residuals.size > 0:
+            std_resid = np.sqrt(residuals[0] / len(y))
+        else:
+            std_resid = np.std(y) * 0.01
+            
+        # 预测未来
         predictions = []
-        current_price = last_price
+        last_history = list(data)
         
-        for i in range(1, days + 1):
-            next_date = last_date + timedelta(days=i)
-            # 引入一点随机性或衰减，这里保持简单线性
-            current_price = current_price * (1 + avg_change)
+        last_date = dates[-1]
+        
+        for i in range(days):
+            next_date = last_date + timedelta(days=i+1)
+            
+            # 构造输入特征
+            feat = [1.0]
+            for j in range(1, lag + 1):
+                feat.append(last_history[-j])
+            
+            pred_val = float(np.dot(coeffs, feat))
+            
+            # 误差随时间累积 (简化: sqrt(step))
+            uncertainty = 1.96 * std_resid * np.sqrt(i + 1)
+            
+            prev_val = last_history[-1]
+            change_pct = (pred_val - prev_val) / prev_val * 100
+            
             predictions.append({
-                "date": next_date.strftime("%Y-%m-%d"),
-                "price": round(current_price, 2),
-                "change": round(avg_change * 100, 2)
+                "ts": next_date,
+                "value": round(pred_val, 2),
+                "lower": round(pred_val - uncertainty, 2),
+                "upper": round(pred_val + uncertainty, 2),
+                "change": round(change_pct, 2),
+                "accuracy": "High" if i < 3 else "Medium" # 简单标注
             })
+            
+            # Update history for next step recursion
+            last_history.append(pred_val)
             
         return predictions
 
