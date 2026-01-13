@@ -23,6 +23,36 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/news',
+    name: 'News',
+    component: () => import('@/pages/News.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/monitor',
+    name: 'Monitor',
+    component: () => import('@/pages/Monitor.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('@/pages/Settings.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/change-password',
+    name: 'ChangePassword',
+    component: () => import('@/pages/ChangePassword.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/feedback',
+    name: 'Feedback',
+    component: () => import('@/pages/Feedback.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/login',
     name: 'Login',
     component: Login,

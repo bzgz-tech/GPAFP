@@ -1,342 +1,117 @@
 <template>
   <div class="login-container">
+    <!-- Background Elements -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    
     <div class="login-content">
-      <div class="login-header">
-        <img :src="logoUrl" class="logo-icon" alt="Logo" />
-        <h1 class="app-title">黄金价格分析与预测平台</h1>
-        <p class="app-subtitle">专业的市场数据分析与趋势预测工具</p>
-      </div>
-      
-      <el-card class="login-card" shadow="hover">
-        <template #header>
-          <div class="card-header">
-            <span>{{ modeTitle }}</span>
-          </div>
-        </template>
+      <!-- Left Side: Branding & Highlights -->
+      <div class="login-left">
+        <div class="brand-header">
+          <img :src="logoUrl" class="brand-logo" alt="Logo" />
+          <h1 class="brand-title">黄金价格分析与预测平台</h1>
+        </div>
         
-        <!-- Login Form -->
-        <el-form v-if="mode === 'login'" :model="form" :rules="rules" ref="formRef" size="large" @keyup.enter="onSubmit">
-          <el-form-item prop="username">
-            <el-input v-model="form.username" placeholder="用户名" :prefix-icon="User" />
-          </el-form-item>
-          <el-form-item prop="password">
-            <el-input v-model="form.password" type="password" placeholder="密码" show-password :prefix-icon="Lock" />
-          </el-form-item>
-          <el-form-item v-if="showCaptcha">
-            <div class="captcha-row">
-              <el-input v-model="captchaCode" placeholder="验证码" :prefix-icon="Picture" />
-              <div class="captcha-img" @click="fetchCaptcha" title="点击刷新验证码">
-                <img v-if="captchaUrl" :src="captchaUrl" alt="验证码" />
-              </div>
-            </div>
-          </el-form-item>
-          <div class="form-actions">
-            <el-checkbox v-model="remember">记住我</el-checkbox>
-            <div class="link-group">
-              <el-button link type="primary" @click="mode = 'register'">注册账号</el-button>
-              <el-divider direction="vertical" />
-              <el-button link type="primary" @click="mode = 'change-password'">修改密码</el-button>
-            </div>
-          </div>
-          <el-form-item>
-            <el-button type="primary" :loading="loading" @click="onSubmit" class="submit-btn">登录</el-button>
-          </el-form-item>
-        </el-form>
+        <div class="slogan-container">
+          <h2 class="slogan">数智金市 · 预见未来</h2>
+          <p class="sub-slogan">AI 驱动的黄金投资决策引擎</p>
+        </div>
 
-        <!-- Register Form -->
-        <el-form v-else-if="mode === 'register'" :model="registerForm" :rules="registerRules" ref="registerFormRef" size="large" @keyup.enter="onRegister">
-          <el-form-item prop="username">
-            <el-input v-model="registerForm.username" placeholder="用户名" :prefix-icon="User" />
-          </el-form-item>
-          <el-form-item prop="password">
-            <el-input v-model="registerForm.password" type="password" placeholder="密码" show-password :prefix-icon="Lock" />
-          </el-form-item>
-          <el-form-item prop="confirmPassword">
-            <el-input v-model="registerForm.confirmPassword" type="password" placeholder="确认密码" show-password :prefix-icon="Lock" />
-          </el-form-item>
-          <div class="form-actions right-align">
-            <el-button link type="primary" @click="mode = 'login'">返回登录</el-button>
-          </div>
-          <el-form-item>
-            <el-button type="primary" :loading="loading" @click="onRegister" class="submit-btn">注册</el-button>
-          </el-form-item>
-        </el-form>
-
-        <!-- Change Password Form -->
-        <el-form v-else :model="changePwdForm" :rules="changePwdRules" ref="changePwdFormRef" size="large" @keyup.enter="onChangePassword">
-          <el-form-item prop="username">
-            <el-input v-model="changePwdForm.username" placeholder="用户名" :prefix-icon="User" />
-          </el-form-item>
-          <el-form-item prop="oldPassword">
-            <el-input v-model="changePwdForm.oldPassword" type="password" placeholder="旧密码" show-password :prefix-icon="Lock" />
-          </el-form-item>
-          <el-form-item prop="newPassword">
-            <el-input v-model="changePwdForm.newPassword" type="password" placeholder="新密码" show-password :prefix-icon="Lock" />
-          </el-form-item>
-          <el-form-item prop="confirmNewPassword">
-            <el-input v-model="changePwdForm.confirmNewPassword" type="password" placeholder="确认新密码" show-password :prefix-icon="Lock" />
-          </el-form-item>
-          <el-form-item>
-            <div class="captcha-row">
-              <el-input v-model="changePwdCaptchaCode" placeholder="验证码" :prefix-icon="Picture" />
-              <div class="captcha-img" @click="fetchCaptcha" title="点击刷新验证码">
-                <img v-if="captchaUrl" :src="captchaUrl" alt="验证码" />
-              </div>
+        <div class="highlights">
+          <div class="highlight-item" v-for="(item, index) in highlights" :key="index">
+            <div class="highlight-icon-wrapper">
+              <el-icon class="highlight-icon"><component :is="item.icon" /></el-icon>
             </div>
-          </el-form-item>
-          <div class="form-actions right-align">
-            <el-button link type="primary" @click="mode = 'login'">返回登录</el-button>
+            <div class="highlight-text">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.desc }}</p>
+            </div>
           </div>
-          <el-form-item>
-            <el-button type="primary" :loading="loading" @click="onChangePassword" class="submit-btn">修改密码</el-button>
-          </el-form-item>
-        </el-form>
-      </el-card>
+        </div>
+        
+        <div class="footer-copyright">
+          © 2026 GPAFP. All Rights Reserved.
+        </div>
+      </div>
+
+      <!-- Right Side: Login Form -->
+      <div class="login-right">
+        <div class="login-card">
+          <div class="form-header">
+            <h2>{{ modeTitle }}</h2>
+            <p class="form-subtitle">{{ modeSubtitle }}</p>
+          </div>
+          
+          <transition name="fade-slide" mode="out-in">
+            <component 
+              :is="currentComponent" 
+              :initial-username="savedUsername"
+              @switch-mode="handleSwitchMode" 
+              @registered="handleRegistered"
+              @password-changed="handlePasswordChanged"
+            />
+          </transition>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/store'
-import api from '@/services/api'
-import { ElMessage } from 'element-plus'
-import { User, Lock, Picture } from '@element-plus/icons-vue'
+import { ref, computed, shallowRef } from 'vue'
+import { Monitor, Cpu, TrendCharts, Bell } from '@element-plus/icons-vue'
 import logoUrl from '@/assets/logo.svg'
+import LoginForm from '@/components/auth/LoginForm.vue'
+import RegisterForm from '@/components/auth/RegisterForm.vue'
+import ChangePasswordForm from '@/components/auth/ChangePasswordForm.vue'
 
-const router = useRouter()
-const userStore = useUserStore()
+// Highlights Data
+const highlights = [
+  { icon: Monitor, title: '全维监控', desc: '实时行情秒级刷新，多周期 K 线深度洞察' },
+  { icon: Cpu, title: 'AI 智脑', desc: '大模型生成深度研报，自动解读技术指标' },
+  { icon: TrendCharts, title: '精准预测', desc: '机器学习算法预测走势，量化风险置信区间' },
+  { icon: Bell, title: '风控哨兵', desc: '7*24 小时价格异动监测，关键点位实时告警' }
+]
 
-// Captcha
-const showCaptcha = ref(false)
-const captchaUrl = ref('')
-const captchaId = ref('')
-const captchaCode = ref('')
-const registerCaptchaCode = ref('')
-const changePwdCaptchaCode = ref('')
-
-const fetchCaptcha = async () => {
-  try {
-    const res = await api.get('/auth/captcha')
-    captchaId.value = res.data.captcha_id
-    captchaUrl.value = res.data.image
-  } catch (error) {
-    console.error('Failed to fetch captcha', error)
-  }
-}
-
-// Mode: login, register, change-password
+// Mode Management
 const mode = ref('login')
+const savedUsername = ref('')
+
+const currentComponent = computed(() => {
+  switch (mode.value) {
+    case 'register': return RegisterForm
+    case 'change-password': return ChangePasswordForm
+    default: return LoginForm
+  }
+})
 
 const modeTitle = computed(() => {
   switch (mode.value) {
-    case 'register':
-      return '注册账号'
-    case 'change-password':
-      return '修改密码'
-    default:
-      return '用户登录'
+    case 'register': return '注册账号'
+    case 'change-password': return '修改密码'
+    default: return '欢迎回来'
   }
 })
 
-// Login Form
-const form = reactive({
-  username: '',
-  password: '',
-})
-const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-}
-const formRef = ref()
-
-// Register Form
-const registerForm = reactive({
-  username: '',
-  password: '',
-  confirmPassword: ''
-})
-const passwordStrengthRule = {
-  pattern: /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/,
-  message: '密码需至少8位，包含字母和数字',
-  trigger: 'blur'
-}
-
-const registerRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    passwordStrengthRule
-  ],
-  confirmPassword: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
-    {
-      validator: (_rule: any, value: string, callback: any) => {
-        if (value !== registerForm.password) {
-          callback(new Error('两次输入的密码不一致'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ]
-}
-const registerFormRef = ref()
-
-// Change Password Form
-const changePwdForm = reactive({
-  username: '',
-  oldPassword: '',
-  newPassword: '',
-  confirmNewPassword: ''
-})
-const changePwdRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  oldPassword: [{ required: true, message: '请输入旧密码', trigger: 'blur' }],
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    passwordStrengthRule
-  ],
-  confirmNewPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
-    {
-      validator: (_rule: any, value: string, callback: any) => {
-        if (value !== changePwdForm.newPassword) {
-          callback(new Error('两次输入的密码不一致'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ]
-}
-const changePwdFormRef = ref()
-
-const loading = ref(false)
-const remember = ref(true)
-
-onMounted(() => {
-  fetchCaptcha()
+const modeSubtitle = computed(() => {
+  switch (mode.value) {
+    case 'register': return '创建一个新账号以开始使用'
+    case 'change-password': return '重置您的账户密码'
+    default: return '请登录您的账号以继续'
+  }
 })
 
-const onSubmit = async () => {
-  if (formRef.value) {
-    await formRef.value.validate()
-  }
-  if (showCaptcha.value && !captchaCode.value) {
-    ElMessage.warning('请输入验证码')
-    return
-  }
-  loading.value = true
-  try {
-    const params = new URLSearchParams()
-    params.append('username', form.username)
-    params.append('password', form.password)
-    if (showCaptcha.value) {
-      params.append('captcha_id', captchaId.value)
-      params.append('captcha_code', captchaCode.value)
-    }
-    
-    const response = await api.post('/auth/login', params)
-    userStore.setToken(response.data.access_token)
-    if (!remember.value) {
-      sessionStorage.setItem('token', response.data.access_token)
-    }
-    // Fetch user info
-    await userStore.fetchUser()
-    ElMessage.success('登录成功')
-    router.push('/')
-  } catch (error: any) {
-    const detail = error?.response?.data?.detail
-    if (error?.response?.status === 400 && detail === 'Require Captcha') {
-      showCaptcha.value = true
-      fetchCaptcha()
-      ElMessage.warning('为了您的账号安全，请输入验证码')
-    } else {
-      ElMessage.error(detail || '登录失败')
-      // If we are already showing captcha, refresh it on error
-      if (showCaptcha.value) {
-        fetchCaptcha()
-        captchaCode.value = ''
-      }
-    }
-  } finally {
-    loading.value = false
-  }
+const handleSwitchMode = (newMode: string) => {
+  mode.value = newMode
 }
 
-const onRegister = async () => {
-  if (registerFormRef.value) {
-    await registerFormRef.value.validate()
-  }
-  if (!registerCaptchaCode.value) {
-    ElMessage.warning('请输入验证码')
-    return
-  }
-  loading.value = true
-  try {
-    // Register user (email is optional/removed)
-    await api.post('/auth/register', {
-      username: registerForm.username,
-      password: registerForm.password,
-      email: null,
-      captcha_id: captchaId.value,
-      captcha_code: registerCaptchaCode.value
-    })
-    ElMessage.success('注册成功，请登录')
-    mode.value = 'login'
-    // Auto fill username
-    form.username = registerForm.username
-    // Refresh captcha
-    fetchCaptcha()
-    registerCaptchaCode.value = ''
-    captchaCode.value = ''
-  } catch (error: any) {
-    ElMessage.error(error?.response?.data?.detail || '注册失败')
-    fetchCaptcha()
-    registerCaptchaCode.value = ''
-  } finally {
-    loading.value = false
-  }
+const handleRegistered = (username: string) => {
+  savedUsername.value = username
 }
 
-const onChangePassword = async () => {
-  if (changePwdFormRef.value) {
-    await changePwdFormRef.value.validate()
-  }
-  if (!changePwdCaptchaCode.value) {
-    ElMessage.warning('请输入验证码')
-    return
-  }
-  loading.value = true
-  try {
-    await api.post('/auth/change-password', {
-      username: changePwdForm.username,
-      old_password: changePwdForm.oldPassword,
-      new_password: changePwdForm.newPassword,
-      captcha_id: captchaId.value,
-      captcha_code: changePwdCaptchaCode.value
-    })
-    ElMessage.success('密码修改成功，请重新登录')
-    mode.value = 'login'
-    // Auto fill username
-    form.username = changePwdForm.username
-    // Refresh captcha
-    fetchCaptcha()
-    changePwdCaptchaCode.value = ''
-    captchaCode.value = ''
-  } catch (error: any) {
-    ElMessage.error(error?.response?.data?.detail || '修改密码失败')
-    fetchCaptcha()
-    changePwdCaptchaCode.value = ''
-  } finally {
-    loading.value = false
-  }
+const handlePasswordChanged = (username: string) => {
+  savedUsername.value = username
 }
-
 </script>
 
 <style scoped>
@@ -344,73 +119,230 @@ const onChangePassword = async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
-  background-color: #f0f2f5;
-  background-image: url("data:image/svg+xml,%3Csvg width='64' height='64' viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 16c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zm33.414-6l5.95-5.95L45.95.636 40 6.586 34.05.636 32.636 2.05 38.586 8l-5.95 5.95 1.414 1.414L40 9.414l5.95 5.95 1.414-1.414L41.414 8zM40 48c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zM9.414 40l5.95-5.95-1.414-1.414L8 38.586l-5.95-5.95L.636 34.05 6.586 40l-5.95 5.95 1.414 1.414L8 41.414l5.95 5.95 1.414-1.414L9.414 40z' fill='%239C92AC' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+  height: 100vh;
+  background: #f0f2f5;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Background Shapes */
+.bg-shape {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 1;
+  opacity: 0.15;
+}
+
+.shape-1 {
+  width: 400px;
+  height: 400px;
+  background: linear-gradient(to right, #3b82f6, #60a5fa);
+  top: -100px;
+  right: -100px;
+}
+
+.shape-2 {
+  width: 500px;
+  height: 500px;
+  background: linear-gradient(to right, #8b5cf6, #a78bfa);
+  bottom: -150px;
+  left: -150px;
+  opacity: 0.1;
 }
 
 .login-content {
   display: flex;
+  width: 100%;
+  max-width: 1000px;
+  height: 640px;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  border: none;
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+}
+
+/* Left Side */
+.login-left {
+  flex: 1.1;
+  padding: 60px;
+  display: flex;
   flex-direction: column;
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  position: relative;
+}
+
+.brand-header {
+  display: flex;
   align-items: center;
+  margin-bottom: 40px;
+}
+
+.brand-logo {
+  width: 48px;
+  height: 48px;
+  margin-right: 16px;
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.3));
+}
+
+.brand-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.slogan-container {
+  margin-bottom: 60px;
+}
+
+.slogan {
+  font-size: 42px;
+  font-weight: 800;
+  margin: 0 0 16px;
+  background: linear-gradient(to right, #fbbf24, #f59e0b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.2;
+}
+
+.sub-slogan {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  font-weight: 300;
+}
+
+.highlights {
+  display: flex;
+  flex-direction: column;
   gap: 32px;
 }
 
-.login-header {
+.highlight-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  transition: transform 0.3s ease;
+}
+
+.highlight-item:hover {
+  transform: translateX(8px);
+}
+
+.highlight-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.highlight-icon {
+  font-size: 24px;
+  color: #fbbf24;
+}
+
+.highlight-text h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.highlight-text p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.footer-copyright {
+  margin-top: auto;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
   text-align: center;
 }
 
-.logo-icon {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 16px;
-}
-
-.app-title {
-  font-size: 32px;
-  font-weight: 600;
-  color: #000000d9;
-  margin: 0 0 8px;
-}
-
-.app-subtitle {
-  font-size: 14px;
-  color: #00000073;
-  margin: 0;
+/* Right Side */
+.login-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: #ffffff;
+  position: relative;
 }
 
 .login-card {
-  width: 400px;
-  border-radius: 8px;
+  width: 100%;
+  max-width: 400px;
+  padding: 0 20px;
 }
 
-.card-header {
+.form-header {
+  margin-bottom: 40px;
   text-align: center;
-  font-size: 18px;
-  font-weight: 500;
 }
 
-.form-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+.form-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 8px;
 }
 
-.form-actions.right-align {
-  justify-content: flex-end;
+.form-subtitle {
+  font-size: 15px;
+  color: #64748b;
+  margin: 0;
 }
 
-.link-group {
-  display: flex;
-  align-items: center;
+/* Transitions */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s ease;
 }
 
-.submit-btn {
-  width: 100%;
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
 }
 
-.submit-btn, .reset-btn {
-  width: 100%;
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+  .login-content {
+    flex-direction: column;
+    height: auto;
+    max-width: 500px;
+  }
+  
+  .login-left {
+    padding: 40px;
+  }
+  
+  .highlights {
+    display: none;
+  }
+  
+  .login-right {
+    padding: 40px;
+  }
 }
 </style>
