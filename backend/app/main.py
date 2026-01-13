@@ -1,11 +1,13 @@
+print("LOADING MAIN APP...")
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.db import engine
 from app.models.base import Base
 # Import all models to ensure they are registered with Base
-from app.models import price, indicator, forecast, backtest, alert, user, task, news
-from app.controllers import market, indicator, forecast, backtest, alert, auth, tasks, news as news_controller, analysis
+from app.models import price, indicator, forecast, backtest, alert, user, task, news, system_setting
+from app.controllers import market, indicator, forecast, backtest, alert, auth, tasks, news as news_controller, analysis, system_setting as system_setting_controller, feedback, upload
 from app.tasks.scheduler import create_scheduler
 from app.core.db import SessionLocal
 from app.dao.user_dao import UserDAO
@@ -32,6 +34,12 @@ if settings.backend_cors_origins:
         allow_headers=["*"],
     )
 
+# Mount Static Files
+# Check if static directory exists, if not create it
+if not os.path.exists("static"):
+    os.makedirs("static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(market.router, prefix="/market", tags=["market"])
@@ -42,6 +50,9 @@ app.include_router(alert.router, prefix="/alert", tags=["alert"])
 app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 app.include_router(news_controller.router, prefix="/news", tags=["news"])
 app.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
+app.include_router(system_setting_controller.router, prefix="/settings", tags=["settings"])
+app.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
+app.include_router(upload.router, prefix="/upload", tags=["upload"])
 
 @app.get("/")
 def root():

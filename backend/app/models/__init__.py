@@ -7,3 +7,4 @@ from .alert import Alert
 from .user import User
 from .task import TaskStatus
 from .news import News
+from .feedback import Feedback

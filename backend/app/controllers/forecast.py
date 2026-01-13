@@ -81,7 +81,7 @@ def read_forecast_history(
     """
     now = datetime.utcnow()
     # 窗口大小映射到天数
-    days_map = {"1d": 1, "1m": 30, "3m": 90, "1y": 365}
+    days_map = {"1d": 1, "7d": 7, "1m": 30, "3m": 90, "1y": 365}
     days = days_map.get(window, 30)
     start_ts = now - timedelta(days=days)
     

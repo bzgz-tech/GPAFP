@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.schemas.market import PriceOut, PricePointOut, PriceDetailedOut
+from app.schemas.market import PriceOut, PricePointOut, PriceDetailedOut, PriceDetailedPagedOut
 from app.services_impl.market_service_impl import MarketServiceImpl
 from app.dao.price_dao import PriceDAO
 from app.core.deps import get_db
@@ -125,18 +125,8 @@ def read_detailed_history(
     db: Session = Depends(get_db),
 ):
     """
-    获取详细的历史价格数据（OHLCV），适用于表格展示。
+    获取详细的历史价格数据（OHLCV），适用于图表展示。
     结果按时间倒序排列（最新的在最前）。
-    
-    参数:
-        symbol (str): 交易品种。
-        timeframe (str): 时间周期。
-        window (str): 历史窗口大小。
-        usd_cny (float): 汇率。
-        db (Session): 数据库会话。
-        
-    返回:
-        list[PriceDetailedOut]: 详细历史价格列表。
     """
     now = datetime.utcnow()
     days_map = {"1d": 1, "1m": 30, "3m": 90, "6m": 180, "1y": 365, "5y": 365 * 5}
@@ -144,32 +134,19 @@ def read_detailed_history(
     start_ts = now - timedelta(days=days)
     
     service = MarketServiceImpl(PriceDAO())
-    rows = service.get_history(db, symbol, timeframe, start_ts)
     
-    # Check if we need to import data
-    should_import = False
-    if not rows:
-        should_import = True
-    elif days > 30:
-        first_ts = rows[0].ts.replace(tzinfo=None)
-        start_gap = (first_ts - start_ts).days > 15
-        count_gap = len(rows) < (days * 0.4)
-        if start_gap or count_gap:
-            should_import = True
-
-    # Auto-import if needed
-    if should_import:
+    # Check total first to decide import
+    total = service.price_dao.count_range(db, symbol, timeframe, start_ts)
+    if total == 0:
         try:
-            # Determine appropriate window based on timeframe
             import_window = window
             if timeframe == "1m":
                 import_window = "5d"
             service.import_history(db, symbol, timeframe, import_window)
-            rows = service.get_history(db, symbol, timeframe, start_ts)
         except Exception as e:
              print(f"Auto-import failed: {e}")
 
-    # 倒序排列，方便前端表格展示
+    rows = service.get_history(db, symbol, timeframe, start_ts)
     rows.reverse()
     
     if symbol == "XAUUSD":
@@ -189,6 +166,60 @@ def read_detailed_history(
             "created_at": r.created_at
         })
     return result
+
+
+@router.get("/history/paged", response_model=PriceDetailedPagedOut)
+def read_history_paged(
+    symbol: str = "XAUUSD",
+    timeframe: str = "1d",
+    window: str = "1m",
+    page: int = 1,
+    page_size: int = 20,
+    usd_cny: float = 7.1,
+    db: Session = Depends(get_db),
+):
+    """
+    获取分页的详细历史价格数据，适用于表格展示。
+    """
+    now = datetime.utcnow()
+    days_map = {"1d": 1, "1m": 30, "3m": 90, "6m": 180, "1y": 365, "5y": 365 * 5}
+    days = days_map.get(window, 30)
+    start_ts = now - timedelta(days=days)
+    
+    service = MarketServiceImpl(PriceDAO())
+    
+    total = service.price_dao.count_range(db, symbol, timeframe, start_ts)
+    
+    if total == 0:
+        try:
+            import_window = window
+            if timeframe == "1m":
+                import_window = "5d"
+            service.import_history(db, symbol, timeframe, import_window)
+            total = service.price_dao.count_range(db, symbol, timeframe, start_ts)
+        except Exception as e:
+             print(f"Auto-import failed: {e}")
+
+    skip = (page - 1) * page_size
+    rows, _ = service.get_history_paged(db, symbol, timeframe, start_ts, None, skip, page_size)
+    
+    if symbol == "XAUUSD":
+        ratio = usd_cny / 31.1034768
+    else:
+        ratio = 1.0
+    
+    result = []
+    for r in rows:
+        result.append({
+            "ts": r.ts.replace(tzinfo=timezone.utc),
+            "open": round(r.open * ratio, 2),
+            "high": round(r.high * ratio, 2),
+            "low": round(r.low * ratio, 2),
+            "close": round(r.close * ratio, 2),
+            "volume": r.volume,
+            "created_at": r.created_at
+        })
+    return {"total": total, "items": result}
 
 @router.post("/import")
 def import_history(

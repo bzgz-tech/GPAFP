@@ -18,6 +18,23 @@ class PriceDAO:
         stmt = stmt.order_by(Price.ts.asc())
         return list(db.execute(stmt).scalars().all())
 
+    def get_range_paged(self, db: Session, symbol: str, timeframe: str, start_ts=None, end_ts=None, skip=0, limit=20) -> list[Price]:
+        stmt = select(Price).where(Price.symbol == symbol, Price.timeframe == timeframe)
+        if start_ts is not None:
+            stmt = stmt.where(Price.ts >= start_ts)
+        if end_ts is not None:
+            stmt = stmt.where(Price.ts <= end_ts)
+        stmt = stmt.order_by(Price.ts.desc()).offset(skip).limit(limit)
+        return list(db.execute(stmt).scalars().all())
+
+    def count_range(self, db: Session, symbol: str, timeframe: str, start_ts=None, end_ts=None) -> int:
+        stmt = select(func.count()).select_from(Price).where(Price.symbol == symbol, Price.timeframe == timeframe)
+        if start_ts is not None:
+            stmt = stmt.where(Price.ts >= start_ts)
+        if end_ts is not None:
+            stmt = stmt.where(Price.ts <= end_ts)
+        return db.execute(stmt).scalar()
+
     def bulk_insert(self, db: Session, rows: list[Price]) -> int:
         for r in rows:
             db.add(r)

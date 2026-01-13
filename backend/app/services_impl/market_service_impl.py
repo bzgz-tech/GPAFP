@@ -24,6 +24,14 @@ class MarketServiceImpl(MarketService):
         """
         return self.price_dao.get_range(db, symbol, timeframe, start_ts, end_ts)
 
+    def get_history_paged(self, db: Session, symbol: str, timeframe: str, start_ts, end_ts=None, skip=0, limit=20) -> tuple[list[Price], int]:
+        """
+        获取分页的历史价格数据。
+        """
+        rows = self.price_dao.get_range_paged(db, symbol, timeframe, start_ts, end_ts, skip, limit)
+        total = self.price_dao.count_range(db, symbol, timeframe, start_ts, end_ts)
+        return rows, total
+
     def import_history(self, db: Session, symbol: str, timeframe: str, window: str) -> int:
         """
         从外部数据源（如 Yahoo Finance）导入历史数据。

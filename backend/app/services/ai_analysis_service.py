@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 class AIAnalysisService(ABC):
     @abstractmethod
-    def generate_report(self, symbol: str, data: list[dict], indicators: dict) -> str:
+    def generate_report(self, symbol: str, data: list[dict], indicators: dict) -> dict:
         """
         根据市场数据和指标生成分析报告
         
@@ -12,6 +12,6 @@ class AIAnalysisService(ABC):
             indicators: 只有最新一期的技术指标值
             
         Returns:
-            str: Markdown 格式的分析报告
+            dict: 包含 'content' (Markdown 报告) 和 'model' (使用的模型名称)
         """
         pass

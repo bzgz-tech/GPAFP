@@ -35,3 +35,9 @@ class MarketService:
             list[Price]: 价格数据列表。
         """
         raise NotImplementedError
+
+    def get_history_paged(self, db: Session, symbol: str, timeframe: str, start_ts, end_ts=None, skip=0, limit=20) -> tuple[list[Price], int]:
+        """
+        获取分页的历史价格数据。
+        """
+        raise NotImplementedError

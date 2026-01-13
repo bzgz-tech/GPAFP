@@ -76,7 +76,7 @@ def read_indicator_history(
         list[IndicatorPointOut]: 指标历史点序列。价格类指标已换算单位。
     """
     now = datetime.utcnow()
-    days_map = {"1d": 1, "1m": 30, "3m": 90, "1y": 365}
+    days_map = {"1d": 1, "7d": 7, "1m": 30, "3m": 90, "1y": 365}
     days = days_map.get(window, 30)
     start_ts = now - timedelta(days=days)
     

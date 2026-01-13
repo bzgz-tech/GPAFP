@@ -33,3 +33,8 @@ class PricePointOut(BaseModel):
     ts: datetime
     value: float
     created_at: datetime | None = None
+
+
+class PriceDetailedPagedOut(BaseModel):
+    total: int
+    items: list[PriceDetailedOut]

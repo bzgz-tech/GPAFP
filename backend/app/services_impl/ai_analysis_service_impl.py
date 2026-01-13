@@ -4,10 +4,14 @@ import pandas as pd
 from datetime import datetime
 from app.core.config import settings
 from app.services.ai_analysis_service import AIAnalysisService
+from app.services_impl.system_setting_service_impl import SystemSettingServiceImpl
 
 class AIAnalysisServiceImpl(AIAnalysisService):
     USD_CNY_RATE = 7.1
     OZ_TO_GRAM = 31.1034768
+    
+    def __init__(self):
+        self.settings_service = SystemSettingServiceImpl()
     
     def _convert_price(self, price_usd: float) -> float:
         """
@@ -17,19 +21,31 @@ class AIAnalysisServiceImpl(AIAnalysisService):
             return 0.0
         return round(float(price_usd) * self.USD_CNY_RATE / self.OZ_TO_GRAM, 2)
 
-    def generate_report(self, symbol: str, data: list[dict], indicators: dict) -> str:
+    def _get_data_range(self, data: list[dict]) -> tuple[str, str]:
+        if not data:
+            return "N/A", "N/A"
+        start = data[0].get('ts', 'N/A')
+        end = data[-1].get('ts', 'N/A')
+        return start, end
+
+    def generate_report(self, symbol: str, data: list[dict], indicators: dict) -> dict:
         """
         生成市场分析报告。
         如果配置了 LLM API Key，则调用大模型；否则使用内置规则引擎生成基础报告。
         """
-        if settings.llm_api_key and settings.llm_api_key.strip():
+        ai_config = self.settings_service.get_ai_config()
+        api_key = ai_config.get('ai_api_key') or settings.llm_api_key
+        
+        if api_key and api_key.strip():
             try:
-                return self._call_llm(symbol, data, indicators)
+                return self._call_llm(symbol, data, indicators, ai_config)
             except Exception as e:
                 print(f"LLM调用失败，降级为规则分析: {e}")
-                return self._rule_based_analysis(symbol, data, indicators) + "\n\n*(注：AI服务暂时不可用，以上为基础规则分析)*"
+                report = self._rule_based_analysis(symbol, data, indicators) + "\n\n*(注：AI服务暂时不可用，以上为基础规则分析)*"
+                return {"content": report, "model": "Rule Engine (Fallback)"}
         else:
-            return self._rule_based_analysis(symbol, data, indicators)
+            report = self._rule_based_analysis(symbol, data, indicators)
+            return {"content": report, "model": "Rule Engine"}
 
     def _format_data_for_prompt(self, data: list[dict], indicators: dict) -> str:
         # Calculate MA20 for the provided data
@@ -74,46 +90,61 @@ class AIAnalysisServiceImpl(AIAnalysisService):
 {ind_str}
 """
 
-    def _call_llm(self, symbol, data, indicators) -> str:
+    def _call_llm(self, symbol, data, indicators, ai_config=None) -> dict:
+        if ai_config is None:
+            ai_config = self.settings_service.get_ai_config()
+            
+        api_key = ai_config.get('ai_api_key') or settings.llm_api_key
+        model = ai_config.get('ai_model') or settings.llm_model
+        
+        start_date, end_date = self._get_data_range(data)
         context = self._format_data_for_prompt(data, indicators)
         
         prompt = f"""
-你是一位专业的金融市场分析师。请参考以下格式，根据提供的 {symbol} (黄金/人民币，单位：元/克) 市场数据，撰写一份详细的分析报告。
+你是一位专业的金融市场分析师。请根据提供的 {symbol} (黄金/人民币，单位：元/克) 市场数据，撰写一份结构清晰、重点突出的分析报告。
 
 【参考格式】：
-一、核心信息
-标的：{symbol} (CNY/g)
-周期：日 K 线
-均线：20 日均线（MA20），代表中期市场平均成本
-二、走势阶段拆解
-1. 初期（...）：描述趋势启动或关键突破
-2. 中期（...）：描述趋势延续情况
-3. 近期（...）：描述当前回调或加速情况
-三、当前信号与操作参考
-趋势判断：...
-关键信号：...
-操作建议：...
-四、注意点
+### 📊 市场分析报告：{symbol} (CNY/g)
+**分析周期**：日 K 线 | **数据范围**：{start_date} 至 {end_date} | **基准均线**：MA20 (中期成本)
+
+#### 1. 核心观点
+- **趋势判断**：[上涨/下跌/震荡]
+- **关键价位**：支撑位 [xxx]，压力位 [xxx]
+
+#### 2. 走势阶段拆解
+- **初期 (启动)**：...
+- **中期 (延续)**：...
+- **近期 (现状)**：...
+
+#### 3. 技术信号解读
+- **均线系统**：... (结合 MA20 分析多空力度)
+- **辅助指标**：... (RSI/MACD 等)
+
+#### 4. 操作建议 💡
+- **策略**：...
+- **风控**：...
+
+#### 5. 风险提示 ⚠️
 ...
 
 【市场数据】：
 {context}
 
 要求：
-1. 严格按照上述【参考格式】的四个章节进行输出。
-2. 结合数据中的 MA20 和收盘价关系进行深入分析（金叉/死叉、支撑/压力）。
-3. 语言专业、客观。
-4. 字数控制在 400-600 字。
-5. 报告中涉及价格的地方，请统一使用“元/克”作为单位。
+1. **严格遵循上述 Markdown 格式**，使用二级标题(###)和三级标题(####)。
+2. **增强可读性**：关键数字（如价格、涨跌幅）请使用 **加粗** 显示。
+3. **数据准确**：结合数据中的 MA20 和收盘价关系进行深入分析。
+4. **单位统一**：所有价格均使用“元/克”。
+5. **字数控制**：400-600 字，语言专业且简练。
 """
         
         headers = {
-            "Authorization": f"Bearer {settings.llm_api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         
         payload = {
-            "model": settings.llm_model,
+            "model": model,
             "messages": [
                 {"role": "system", "content": "You are a helpful financial analyst assistant."},
                 {"role": "user", "content": prompt}
@@ -122,8 +153,10 @@ class AIAnalysisServiceImpl(AIAnalysisService):
         }
         
         # 兼容 OpenAI 格式的接口
-        base_url = settings.llm_base_url.rstrip('/')
-        chat_path = settings.llm_chat_path.lstrip('/')
+        base_url_config = ai_config.get('ai_base_url') or settings.llm_base_url
+        base_url = base_url_config.rstrip('/')
+        chat_path_config = ai_config.get('ai_chat_path') or settings.llm_chat_path
+        chat_path = chat_path_config.lstrip('/')
         url = f"{base_url}/{chat_path}"
         
         response = requests.post(url, json=payload, headers=headers, timeout=30)
@@ -131,12 +164,13 @@ class AIAnalysisServiceImpl(AIAnalysisService):
         
         result = response.json()
         content = result['choices'][0]['message']['content']
-        return content
+        return {"content": content, "model": model}
 
     def _rule_based_analysis(self, symbol, data, indicators) -> str:
         if not data:
             return "数据不足，无法分析。"
             
+        start_date, end_date = self._get_data_range(data)
         last = data[-1]
         close = self._convert_price(float(last['close']))
         prev_close = self._convert_price(float(data[-2]['close'])) if len(data) > 1 else close
@@ -173,30 +207,31 @@ class AIAnalysisServiceImpl(AIAnalysisService):
                 macd_msg = "MACD死叉运行，动能偏空"
 
         return f"""
-### {symbol} 智能分析报告 (基础版)
+### 📊 {symbol} 智能分析报告 (基础版)
 
-**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**生成时间**：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**数据范围**：{start_date} 至 {end_date}
 
-#### 一、核心信息
-- **标的**: {symbol} (当前价格 {close}元/克)
-- **周期**: 日 K 线
-- **均线**: 20 日均线 (MA20: {round(ma20, 2) if ma20 else 'N/A'}元/克)，代表中期市场平均成本
+#### 1. 核心信息
+- **标的**: {symbol}
+- **当前价格**: **{close}** 元/克
+- **MA20均线**: **{round(ma20, 2) if ma20 else 'N/A'}** 元/克
 
-#### 二、走势阶段拆解
-1. **近期表现**: 
-   价格较前一日{"上涨" if change > 0 else "下跌"} **{abs(change_pct):.2f}%**。
-   当前价格位于 MA20 {"上方" if ma20 and close > ma20 else "下方"}，显示中期{"多头" if ma20 and close > ma20 else "空头"}信号。
+#### 2. 走势阶段拆解
+- **近期表现**: 
+  价格较前一日{"上涨" if change > 0 else "下跌"} **{abs(change_pct):.2f}%**。
+  当前价格位于 MA20 {"上方" if ma20 and close > ma20 else "下方"}，显示中期{"多头" if ma20 and close > ma20 else "空头"}信号。
 
-#### 三、当前信号与操作参考
+#### 3. 当前信号与操作参考
 - **趋势判断**: 当前处于 **{trend}** 阶段。
 - **关键指标**:
   - RSI ({round(rsi, 2) if rsi else '-'}): {rsi_msg}。
   - MACD: {macd_msg}。
-- **操作建议**:
+- **操作建议 💡**:
   {("持有多单：可继续持有，以 20 日均线作为止损线。" if trend == "上涨" else "持有空单：可继续持有，以 20 日均线作为止损线。" if trend == "下跌" else "市场震荡，建议观望，高抛低吸。")}
 
-#### 四、注意点
-当前最新价 ({close}) {"仍在" if ma20 and close > ma20 else "处于"} 20 日均线{"上方" if ma20 and close > ma20 else "下方"}。
+#### 4. 风险提示 ⚠️
+当前最新价 (**{close}**) {"仍在" if ma20 and close > ma20 else "处于"} 20 日均线{"上方" if ma20 and close > ma20 else "下方"}。
 若后续价格{"跌破" if ma20 and close > ma20 else "突破"} MA20，则需警惕趋势反转。
 
 > *提示：未配置 AI API Key，以上为内置规则生成的分析报告。*
