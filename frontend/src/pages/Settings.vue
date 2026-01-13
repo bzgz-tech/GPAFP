@@ -49,6 +49,32 @@
           </el-form-item>
         </el-form>
       </el-card>
+
+      <!-- Notification Settings -->
+      <el-card shadow="hover" class="setting-card" style="margin-top: 20px;">
+        <template #header>
+          <div class="card-header">
+            <span>系统通知配置</span>
+            <el-tag type="info" size="small">微信推送</el-tag>
+          </div>
+        </template>
+        
+        <el-form :model="notifyForm" label-width="120px">
+            <el-form-item label="推送方式">
+                <el-select v-model="notifyForm.notification_type">
+                    <el-option label="PushPlus (推荐)" value="pushplus" />
+                    <el-option label="企业微信 Webhook" value="wechat_work" />
+                </el-select>
+            </el-form-item>
+            <el-form-item label="Token/URL">
+                <el-input v-model="notifyForm.notification_token" placeholder="请输入 PushPlus Token 或 Webhook URL" type="password" show-password />
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="saveNotifyConfig" :loading="savingNotify">保存配置</el-button>
+                <el-button @click="testNotify" :loading="testingNotify">发送测试消息</el-button>
+            </el-form-item>
+        </el-form>
+      </el-card>
     </div>
   </div>
 </template>
@@ -70,6 +96,14 @@ const aiForm = reactive({
   ai_model: '',
   ai_api_key: ''
 })
+
+// Notification Config
+const notifyForm = reactive({
+  notification_type: 'pushplus',
+  notification_token: ''
+})
+const savingNotify = ref(false)
+const testingNotify = ref(false)
 
 const aiRules = {
   ai_provider: [{ required: true, message: '请选择 AI 提供商', trigger: 'change' }],
@@ -160,6 +194,8 @@ const loadSettings = async () => {
           // @ts-ignore
           aiForm[item.key] = item.value
         }
+        if (item.key === 'notification_type') notifyForm.notification_type = item.value
+        if (item.key === 'notification_token') notifyForm.notification_token = item.value
       })
     }
     
@@ -183,7 +219,7 @@ const saveAiConfig = async () => {
         for (const [key, value] of Object.entries(aiForm)) {
           await api.post('/settings/', { key, value })
         }
-        ElMessage.success('配置已保存')
+        ElMessage.success('AI 配置已保存')
         aiConfigured.value = true
       } catch (e) {
         console.error('Failed to save settings', e)
@@ -193,6 +229,35 @@ const saveAiConfig = async () => {
       }
     }
   })
+}
+
+const saveNotifyConfig = async () => {
+  savingNotify.value = true
+  try {
+    await api.post('/settings/', { key: 'notification_type', value: notifyForm.notification_type })
+    await api.post('/settings/', { key: 'notification_token', value: notifyForm.notification_token })
+    ElMessage.success('通知配置已保存')
+  } catch (e) {
+    ElMessage.error('保存通知配置失败')
+  } finally {
+    savingNotify.value = false
+  }
+}
+
+const testNotify = async () => {
+  testingNotify.value = true
+  try {
+    const { data } = await api.post('/settings/config/test_notification', {})
+    if (data.success) {
+      ElMessage.success('测试消息发送成功，请查收')
+    } else {
+      ElMessage.error('测试消息发送失败，请检查配置')
+    }
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '请求失败')
+  } finally {
+    testingNotify.value = false
+  }
 }
 
 const testConnection = async () => {

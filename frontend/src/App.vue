@@ -5,7 +5,7 @@
         <div class="left">
           <div class="logo">
             <img :src="logoUrl" class="logo-icon" alt="Logo" />
-            <span class="brand">黄金分析平台</span>
+            <span class="brand">HJ分析平台</span>
           </div>
           <el-menu
             mode="horizontal"
@@ -52,7 +52,8 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="settings" :icon="Setting">系统设置</el-dropdown-item>
+                <el-dropdown-item command="user_management" :icon="UserFilled" v-if="store.user?.is_admin">用户管理</el-dropdown-item>
+                <el-dropdown-item command="settings" :icon="Setting" v-if="store.user?.is_admin">系统设置</el-dropdown-item>
                 <el-dropdown-item command="change_password" :icon="Lock">修改密码</el-dropdown-item>
                 <el-dropdown-item divided command="logout" :icon="SwitchButton">退出登录</el-dropdown-item>
               </el-dropdown-menu>
@@ -94,7 +95,7 @@ import logoUrl from '@/assets/logo.svg'
 const router = useRouter()
 const route = useRoute()
 const store = useUserStore()
-const isAuthed = computed(() => !!store.token)
+const isAuthed = computed(() => !!store.token && route.name !== 'Login')
 const activePath = computed(() => route.path)
 
 onMounted(() => {
@@ -107,6 +108,8 @@ const handleCommand = (command: string) => {
   if (command === 'logout') {
     store.clearToken()
     router.push('/login')
+  } else if (command === 'user_management') {
+    router.push('/users')
   } else if (command === 'settings') {
     router.push('/settings')
   } else if (command === 'change_password') {

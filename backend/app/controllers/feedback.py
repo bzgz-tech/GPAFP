@@ -5,6 +5,7 @@ from app.core.deps import get_db, get_current_active_user
 from app.services_impl.feedback_service_impl import FeedbackServiceImpl
 from app.schemas.feedback import FeedbackCreate, FeedbackResponse, FeedbackUpdate, FeedbackDetailResponse, FeedbackCommentCreate, FeedbackCommentResponse
 from app.models.user import User
+from app.schemas.pagination import Page
 
 router = APIRouter()
 service = FeedbackServiceImpl()
@@ -20,18 +21,24 @@ def create_feedback(
     """
     return service.create_feedback(db, feedback_in, current_user.id)
 
-@router.get("/", response_model=List[FeedbackResponse])
+@router.get("/", response_model=Page[FeedbackResponse])
 def get_feedbacks(
-    skip: int = 0,
-    limit: int = 100,
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    获取反馈列表（公开）。
+    获取反馈列表（公开），分页显示。
     """
-    # Now all feedbacks are public
-    return service.get_feedbacks(db, skip=skip, limit=limit)
+    skip = (page - 1) * page_size
+    feedbacks, total = service.get_feedbacks(db, skip=skip, limit=page_size)
+    return Page(
+        total=total,
+        items=feedbacks,
+        page=page,
+        page_size=page_size
+    )
 
 @router.get("/{feedback_id}", response_model=FeedbackDetailResponse)
 def get_feedback_detail(

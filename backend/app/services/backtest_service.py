@@ -20,3 +20,9 @@ class BacktestService:
             Backtest | None: 最新回测结果对象，若无则返回 None。
         """
         raise NotImplementedError
+
+    def get_all_backtests(self, db: Session, skip: int = 0, limit: int = 20) -> tuple[list[Backtest], int]:
+        """
+        获取分页的回测结果列表。
+        """
+        raise NotImplementedError

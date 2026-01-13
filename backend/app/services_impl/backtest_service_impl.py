@@ -17,3 +17,9 @@ class BacktestServiceImpl(BacktestService):
         获取指定策略、品种和时间周期的最新回测结果。
         """
         return self.backtest_dao.get_latest(db, strategy, symbol, timeframe)
+
+    def get_all_backtests(self, db: Session, skip: int = 0, limit: int = 20) -> tuple[list[Backtest], int]:
+        """
+        获取分页的回测结果列表。
+        """
+        return self.backtest_dao.get_all(db, skip, limit)

@@ -9,12 +9,12 @@
       <div class="login-left">
         <div class="brand-header">
           <img :src="logoUrl" class="brand-logo" alt="Logo" />
-          <h1 class="brand-title">黄金价格分析与预测平台</h1>
+          <h1 class="brand-title">HJ价格分析与预测平台</h1>
         </div>
         
         <div class="slogan-container">
           <h2 class="slogan">数智金市 · 预见未来</h2>
-          <p class="sub-slogan">AI 驱动的黄金投资决策引擎</p>
+          <p class="sub-slogan">AI 驱动的HJ投资决策引擎</p>
         </div>
 
         <div class="highlights">

@@ -38,6 +38,17 @@
             </template>
         </el-table-column>
       </el-table>
+      <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: flex-end;">
+        <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="total"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
   </div>
 </template>
@@ -50,18 +61,37 @@ import { ElMessage } from 'element-plus'
 
 const newsList = ref<any[]>([])
 const loading = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
 
 const loadNews = async () => {
   loading.value = true
   try {
-    const { data } = await api.get('/news/')
-    newsList.value = data
+    const { data } = await api.get('/news/', {
+      params: {
+        page: currentPage.value,
+        page_size: pageSize.value
+      }
+    })
+    newsList.value = data.items
+    total.value = data.total
   } catch (e) {
     console.error('Load news error', e)
     ElMessage.error('获取新闻失败')
   } finally {
     loading.value = false
   }
+}
+
+const handleSizeChange = (val: number) => {
+  pageSize.value = val
+  loadNews()
+}
+
+const handleCurrentChange = (val: number) => {
+  currentPage.value = val
+  loadNews()
 }
 
 const getImpactType = (impact: string) => {

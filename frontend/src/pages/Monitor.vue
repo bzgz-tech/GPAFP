@@ -36,6 +36,18 @@
               </template>
             </el-table-column>
           </el-table>
+          <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: flex-end;">
+            <el-pagination
+                v-model:current-page="currentPage"
+                v-model:page-size="pageSize"
+                :page-sizes="[5, 10, 20]"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="total"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+                small
+            />
+          </div>
         </el-card>
       </el-col>
 
@@ -98,6 +110,9 @@ import { ElMessage } from 'element-plus'
 const alerts = ref<any[]>([])
 const status = ref<any>({})
 const loadingAlerts = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 const loadingStatus = ref(false)
 const dialogVisible = ref(false)
 const creating = ref(false)
@@ -112,13 +127,31 @@ const alertForm = reactive({
 const loadAlerts = async () => {
   loadingAlerts.value = true
   try {
-    const { data } = await api.get('/alert/active')
-    alerts.value = data
-  } catch {
-    alerts.value = []
+    const { data } = await api.get('/alert/active', {
+      params: {
+        symbol: 'XAUUSD',
+        page: currentPage.value,
+        page_size: pageSize.value
+      }
+    })
+    alerts.value = data.items
+    total.value = data.total
+  } catch (e) {
+    console.error('Load alerts error', e)
+    ElMessage.error('获取告警失败')
   } finally {
     loadingAlerts.value = false
   }
+}
+
+const handleSizeChange = (val: number) => {
+  pageSize.value = val
+  loadAlerts()
+}
+
+const handleCurrentChange = (val: number) => {
+  currentPage.value = val
+  loadAlerts()
 }
 
 const loadStatus = async () => {

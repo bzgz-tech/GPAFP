@@ -4,10 +4,38 @@ from app.schemas.backtest import BacktestOut
 from app.services_impl.backtest_service_impl import BacktestServiceImpl
 from app.dao.backtest_dao import BacktestDAO
 from app.core.deps import get_db
+from app.schemas.pagination import Page
 from datetime import timezone
 
 # 创建路由实例
 router = APIRouter()
+
+@router.get("/", response_model=Page[BacktestOut])
+def read_backtests(
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+):
+    """
+    获取回测结果列表，分页显示。
+    """
+    service = BacktestServiceImpl(BacktestDAO())
+    skip = (page - 1) * page_size
+    items, total = service.get_all_backtests(db, skip=skip, limit=page_size)
+    
+    # Ensure timezone info
+    for item in items:
+        if item.start_ts and item.start_ts.tzinfo is None:
+            item.start_ts = item.start_ts.replace(tzinfo=timezone.utc)
+        if item.end_ts and item.end_ts.tzinfo is None:
+            item.end_ts = item.end_ts.replace(tzinfo=timezone.utc)
+            
+    return Page(
+        total=total,
+        items=items,
+        page=page,
+        page_size=page_size
+    )
 
 @router.get("/latest", response_model=BacktestOut)
 def read_latest_backtest(

@@ -4,8 +4,8 @@
       <div class="form-group">
         <el-form-item label="交易品种">
           <el-select :model-value="symbol" @update:model-value="$emit('update:symbol', $event)" placeholder="选择品种" class="custom-select">
-            <el-option label="现货黄金 (XAUUSD)" value="XAUUSD">
-              <span style="float: left">现货黄金</span>
+            <el-option label="现货HJ (XAUUSD)" value="XAUUSD">
+              <span style="float: left">现货HJ</span>
               <span style="float: right; color: var(--el-text-color-secondary); font-size: 13px;">XAUUSD</span>
             </el-option>
           </el-select>

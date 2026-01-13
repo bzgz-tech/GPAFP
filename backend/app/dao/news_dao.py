@@ -4,11 +4,17 @@ from ..schemas.news import NewsCreate
 from typing import List, Optional
 
 class NewsDAO:
-    def get_latest(self, db: Session, limit: int = 10, category: Optional[str] = None) -> List[News]:
+    def get_latest(self, db: Session, skip: int = 0, limit: int = 10, category: Optional[str] = None) -> List[News]:
         query = db.query(News)
         if category:
             query = query.filter(News.category == category)
-        return query.order_by(News.published_at.desc()).limit(limit).all()
+        return query.order_by(News.published_at.desc()).offset(skip).limit(limit).all()
+
+    def count(self, db: Session, category: Optional[str] = None) -> int:
+        query = db.query(News)
+        if category:
+            query = query.filter(News.category == category)
+        return query.count()
 
     def create(self, db: Session, obj_in: NewsCreate) -> News:
         db_obj = News(

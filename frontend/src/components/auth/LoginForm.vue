@@ -97,6 +97,7 @@ const onSubmit = async () => {
     ElMessage.success('登录成功')
     router.push('/')
   } catch (error: any) {
+    loading.value = false
     const detail = error?.response?.data?.detail
     if (error?.response?.status === 400 && detail === 'Require Captcha') {
       showCaptcha.value = true
@@ -109,8 +110,6 @@ const onSubmit = async () => {
         captchaCode.value = ''
       }
     }
-  } finally {
-    loading.value = false
   }
 }
 </script>

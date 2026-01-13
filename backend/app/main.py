@@ -7,7 +7,10 @@ from app.core.db import engine
 from app.models.base import Base
 # Import all models to ensure they are registered with Base
 from app.models import price, indicator, forecast, backtest, alert, user, task, news, system_setting
-from app.controllers import market, indicator, forecast, backtest, alert, auth, tasks, news as news_controller, analysis, system_setting as system_setting_controller, feedback, upload
+from app.controllers import (
+    auth, market, indicator, forecast, backtest, alert, tasks, news as news_controller,
+    analysis, system_setting as system_setting_controller, feedback, upload, user
+)
 from app.tasks.scheduler import create_scheduler
 from app.core.db import SessionLocal
 from app.dao.user_dao import UserDAO
@@ -53,6 +56,7 @@ app.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
 app.include_router(system_setting_controller.router, prefix="/settings", tags=["settings"])
 app.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
 app.include_router(upload.router, prefix="/upload", tags=["upload"])
+app.include_router(user.router, prefix="/users", tags=["users"])
 
 @app.get("/")
 def root():

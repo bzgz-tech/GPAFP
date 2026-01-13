@@ -5,12 +5,15 @@ from app.schemas.alert import AlertOut, AlertCreate
 from app.services_impl.alert_service_impl import AlertServiceImpl
 from app.dao.alert_dao import AlertDAO
 from app.core.deps import get_db
+from app.schemas.pagination import Page
 
 # 创建路由实例
 router = APIRouter()
 
-@router.get("/active", response_model=List[AlertOut])
+@router.get("/active", response_model=Page[AlertOut])
 def read_active_alerts(
+    page: int = 1,
+    page_size: int = 20,
     symbol: str = "XAUUSD",
     db: Session = Depends(get_db),
 ):
@@ -22,10 +25,17 @@ def read_active_alerts(
         db (Session): 数据库会话依赖。
         
     返回:
-        List[AlertOut]: 活跃告警列表。
+        Page[AlertOut]: 活跃告警列表分页。
     """
     service = AlertServiceImpl(AlertDAO())
-    return service.get_active_alerts(db, symbol)
+    skip = (page - 1) * page_size
+    alerts, total = service.get_active_alerts(db, symbol, skip=skip, limit=page_size)
+    return Page(
+        total=total,
+        items=alerts,
+        page=page,
+        page_size=page_size
+    )
 
 @router.post("/", response_model=AlertOut)
 def create_alert(

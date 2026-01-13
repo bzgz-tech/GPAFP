@@ -35,6 +35,17 @@
            </el-table-column>
            <el-table-column prop="comment_count" label="回复数" width="80" align="center"></el-table-column>
         </el-table>
+        <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: flex-end;">
+            <el-pagination
+                v-model:current-page="currentPage"
+                v-model:page-size="pageSize"
+                :page-sizes="[10, 20, 50, 100]"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="total"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+            />
+        </div>
     </el-card>
 
     <!-- Create Feedback Dialog -->
@@ -244,6 +255,9 @@ const isAdmin = computed(() => store.user?.username === 'admin')
 const allFeedbacks = ref([])
 const loading = ref(false)
 const showCreateDialog = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
 
 // Create Form
 const formRef = ref()
@@ -345,11 +359,27 @@ const renderMarkdown = (content: string) => {
 const fetchFeedbacks = async () => {
   loading.value = true
   try {
-    const { data } = await api.get('/feedback/')
-    allFeedbacks.value = data
+    const { data } = await api.get('/feedback/', {
+      params: {
+        page: currentPage.value,
+        page_size: pageSize.value
+      }
+    })
+    allFeedbacks.value = data.items
+    total.value = data.total
   } finally {
     loading.value = false
   }
+}
+
+const handleSizeChange = (val: number) => {
+  pageSize.value = val
+  fetchFeedbacks()
+}
+
+const handleCurrentChange = (val: number) => {
+  currentPage.value = val
+  fetchFeedbacks()
 }
 
 const openCreateDialog = () => {

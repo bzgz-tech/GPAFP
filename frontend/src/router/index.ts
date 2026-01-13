@@ -57,6 +57,12 @@ const routes: Array<RouteRecordRaw> = [
     name: 'Login',
     component: Login,
   },
+  {
+    path: '/users',
+    name: 'UserManagement',
+    component: () => import('@/pages/UserManagement.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

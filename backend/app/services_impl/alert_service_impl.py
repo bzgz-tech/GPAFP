@@ -21,11 +21,13 @@ class AlertServiceImpl(AlertService):
         self.alert_dao = alert_dao
         self.price_dao = price_dao
 
-    def get_active_alerts(self, db: Session, symbol: str) -> List[Alert]:
+    def get_active_alerts(self, db: Session, symbol: str, skip: int = 0, limit: int = 20) -> tuple[List[Alert], int]:
         """
         获取指定品种的当前活跃告警。
         """
-        return self.alert_dao.get_active(db, symbol)
+        alerts = self.alert_dao.get_active(db, symbol, skip=skip, limit=limit)
+        total = self.alert_dao.count_active(db, symbol)
+        return alerts, total
 
     def create_alert(self, db: Session, name: str, symbol: str, condition: str, threshold: float) -> Alert:
         """

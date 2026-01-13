@@ -73,7 +73,7 @@ def login_access_token(
 
     # 4. Check active status
     if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=400, detail="您的账户已被冻结，请联系管理员处理")
 
     # 5. Success - Reset attempts
     if user.failed_login_attempts > 0:

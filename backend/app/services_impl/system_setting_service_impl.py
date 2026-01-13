@@ -4,6 +4,8 @@ from app.services.system_setting_service import SystemSettingService
 from app.dao.system_setting_dao import SystemSettingDAO
 from app.schemas.system_setting import SystemSetting, SystemSettingCreate
 from app.core.db import SessionLocal
+import requests
+import json
 
 class SystemSettingServiceImpl(SystemSettingService):
     def __init__(self):
@@ -21,19 +23,55 @@ class SystemSettingServiceImpl(SystemSettingService):
         with SessionLocal() as db:
             return self.dao.create_or_update(db, setting)
             
-    def get_ai_config(self) -> dict:
-        """
-        Helper to get all AI related config as a dict
-        """
-        config = {}
+    def get_settings(self) -> dict:
         with SessionLocal() as db:
-            # List of AI related keys
-            keys = ['ai_provider', 'ai_model', 'ai_api_key', 'ai_base_url', 'ai_chat_path']
-            for key in keys:
-                setting = self.dao.get_by_key(db, key)
-                if setting and setting.value:
-                    config[key] = setting.value
-        return config
+            settings_list = self.dao.get_all(db)
+            return {item.key: item.value for item in settings_list}
+
+    def get_ai_config(self) -> dict:
+        settings = self.get_settings()
+        return {
+            'ai_provider': settings.get('ai_provider'),
+            'ai_api_key': settings.get('ai_api_key'),
+            'ai_base_url': settings.get('ai_base_url'),
+            'ai_model': settings.get('ai_model'),
+            'ai_chat_path': settings.get('ai_chat_path'),
+        }
+
+    def send_notification(self, title: str, content: str) -> bool:
+        settings = self.get_settings()
+        notify_type = settings.get('notification_type', 'pushplus')
+        token = settings.get('notification_token')
+        
+        if not token:
+            return False
+            
+        try:
+            if notify_type == 'pushplus':
+                url = 'http://www.pushplus.plus/send'
+                data = {
+                    "token": token,
+                    "title": title,
+                    "content": content,
+                    "template": "html"
+                }
+                resp = requests.post(url, json=data, timeout=10)
+                return resp.status_code == 200 and resp.json().get('code') == 200
+            elif notify_type == 'wechat_work': # 企业微信 Webhook
+                url = token # Token 字段直接填完整 Webhook URL
+                data = {
+                    "msgtype": "text",
+                    "text": {
+                        "content": f"【{title}】\n{content}"
+                    }
+                }
+                resp = requests.post(url, json=data, timeout=10)
+                return resp.status_code == 200 and resp.json().get('errcode') == 0
+            
+            return False
+        except Exception as e:
+            print(f"Notification failed: {e}")
+            return False
 
     def test_llm_connection(self, config: dict) -> dict:
         import requests

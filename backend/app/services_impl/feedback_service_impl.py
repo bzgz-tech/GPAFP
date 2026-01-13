@@ -22,18 +22,19 @@ class FeedbackServiceImpl(FeedbackService):
         )
         return self.dao.create(db, feedback)
 
-    def get_feedbacks(self, db: Session, user_id: Optional[int] = None, skip: int = 0, limit: int = 100) -> List[Feedback]:
+    def get_feedbacks(self, db: Session, user_id: Optional[int] = None, skip: int = 0, limit: int = 100) -> tuple[List[Feedback], int]:
         # Public Feed - ignore user_id for list view, or optional filter
         # But per requirements: "all feedbacks visible to everyone"
         # So we default to getting all.
         feedbacks = self.dao.get_all(db, skip, limit)
+        total = self.dao.count(db)
         
-        # Populate username and comment count
+        # Populate username (comment_count is already set by DAO)
         for f in feedbacks:
             if f.user:
                 f.username = f.user.username
-            f.comment_count = len(f.comments) if f.comments else 0
-        return feedbacks
+                
+        return feedbacks, total
 
     def get_feedback_detail(self, db: Session, feedback_id: int) -> Optional[Feedback]:
         feedback = self.dao.get_by_id(db, feedback_id)

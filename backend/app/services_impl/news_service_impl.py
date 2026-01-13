@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
+from typing import List
 from ..services.news_service import NewsService
 from ..dao.news_dao import NewsDAO
+from ..models.news import News
 from ..schemas.news import NewsCreate
 from datetime import datetime, timedelta
 import random
@@ -9,8 +11,10 @@ class NewsServiceImpl(NewsService):
     def __init__(self, news_dao: NewsDAO):
         self.news_dao = news_dao
 
-    def get_latest_news(self, db: Session, limit: int = 20, category: str | None = None):
-        return self.news_dao.get_latest(db, limit=limit, category=category)
+    def get_latest_news(self, db: Session, skip: int = 0, limit: int = 20, category: str | None = None) -> tuple[List[News], int]:
+        news = self.news_dao.get_latest(db, skip=skip, limit=limit, category=category)
+        total = self.news_dao.count(db, category=category)
+        return news, total
 
     def fetch_and_update(self, db: Session) -> int:
         # Mock implementation: Generate some fake news if DB is empty or just add some new ones
@@ -37,7 +41,7 @@ class NewsServiceImpl(NewsService):
             },
             {
                 "title": "中东局势紧张加剧，避险情绪升温",
-                "summary": "由于地缘政治冲突升级，市场避险需求增加，黄金价格获得支撑。",
+                "summary": "由于地缘政治冲突升级，市场避险需求增加，HJ价格获得支撑。",
                 "source": "GlobalTimes",
                 "impact": "Bullish",
                 "category": "Geopolitics"

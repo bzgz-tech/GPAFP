@@ -101,7 +101,7 @@ class AIAnalysisServiceImpl(AIAnalysisService):
         context = self._format_data_for_prompt(data, indicators)
         
         prompt = f"""
-你是一位专业的金融市场分析师。请根据提供的 {symbol} (黄金/人民币，单位：元/克) 市场数据，撰写一份结构清晰、重点突出的分析报告。
+你是一位专业的金融市场分析师。请根据提供的 {symbol} (HJ/人民币，单位：元/克) 市场数据，撰写一份结构清晰、重点突出的分析报告。
 
 【参考格式】：
 ### 📊 市场分析报告：{symbol} (CNY/g)
